@@ -1,0 +1,20 @@
+# Python environment
+venv/
+__pycache__/
+*.pyc
+
+# Database
+dashboard.db
+metrics.sqlite
+
+# Security Keys (VERY IMPORTANT)
+service-account-key.json
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
