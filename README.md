@@ -51,3 +51,25 @@ Each team must work **only** within their assigned folders.
 * **`app/data_pipeline/` (Team Data pipeline)**: 
     * **Role**: Data Automation (ETL).
     * **Files**: `etl_functions.py` (Connects to Google Sheets using service-account-key.json(message me if you need this, this is confidential), and also gspread and pandas to process the data then transform all the data into SQLite, write the script inside here to generate a new file **dashboard.db** which is the SQLite database).
+
+
+---
+
+## 🎨 For Frontend Members
+**Goal:** Preview the UI and test Chart.js layouts.
+To see your UI designs and charts in action:
+
+1. **Start the Backend:** Run `python wsgi.py`.
+2. **View the Dashboard:** Open [http://127.0.0.1:5000/](http://127.0.0.1:5000/) in your browser.
+3. **Automatic Refresh:** Every time you save changes to `index.html`, refresh your browser page.
+4. **Data Testing:** If you want to see the raw data your charts are using, visit [http://127.0.0.1:5000/api/data](http://127.0.0.1:5000/api/data). (The API endpoint, the mock data store here)
+
+## ⚙️ For Backend Testing Commands
+**For Data Pipeline:**
+Run this to test sync Google Sheets to the Database:
+`python -m app.data_pipeline.etl_functions`
+
+**For API & Logic:**
+Run this to start the server:
+`python wsgi.py`
+Then verify data at: http://127.0.0.1:5000/api/data
