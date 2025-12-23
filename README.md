@@ -73,3 +73,10 @@ Run this to test sync Google Sheets to the Database:
 Run this to start the server:
 `python wsgi.py`
 Then verify data at: http://127.0.0.1:5000/api/data
+
+
+
+
+---
+## 👀 To view the SQLite database table structure
+install `SQLite Viewer` extension in VSCode.
