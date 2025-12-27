@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Suffolk House Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="dashboard-wrapper">
+    <main class="left-panel">
+        <header class="main-header">
+            <button onclick="goBack()" style="padding:5px 10px; cursor:pointer;">← Back</button>
+            <div class="header-center">
+                <h1>Suffolk House</h1>
+            </div>
+        </header>
+
+        <div class="summary-container">
+            <div class="card">
+                <div class="card-header">COUNCIL MEMBER</div>
+                <div class="card-body">
+                    <div class="icon-circle"><img src="./images/council member.jpg" alt="Council Icon"></div>
+                    <div class="number">80</div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">MEMBERSHIPS</div>
+                <div class="card-body">
+                    <div class="icon-circle"><img src="./images/membership.png" alt="Membership Icon"></div>
+                    <div class="number">10,500</div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">MEMBERSHIP GROWTH</div>
+                <div class="card-body">
+                    <div class="icon-circle">📈</div>
+                    <div class="number">8%</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="left-section-header">MEMBERSHIP DEMOGRAPHIC</div>
+        <div class="middle-container">
+            <div class="chart-box"></div>
+            <div class="chart-box"></div>
+        </div>
+
+        <div class="left-section-header">ORGANISATION DATA</div>
+        <div class="bottom-container">
+            <div class="chart-box full-width"></div>
+        </div>
+    </main>
+
+    <aside class="right-panel">
+        <div class="right-section-header">SITE INFO</div>
+        <div class="small-box-group">
+            <div class="site-box">
+                <img src="./images/suffolk house.jpg" alt="Suffolk House Image">
+                <div class="image-label">Suffolk House</div>
+            </div>
+        </div>
+        <div class="contact-info">
+            <p><strong>FOR MORE DETAIL:</strong></p>
+            <p>NO.2, JALAN STONOR, 50450 KUALA LUMPUR</p>
+            <p>OFFICE: +603-2144 9273</p>
+            <p>OPENING HOURS: 10AM-5PM (TUESDAYS - SATURDAYS)</p>
+            <p>CLOSED ON PUBLIC HOLIDAYS</p>
+        </div>
+    </aside>
+</div>
+<script>
+function goBack(){ window.location.href='index.html'; }
+</script>
+</body>
+</html>
