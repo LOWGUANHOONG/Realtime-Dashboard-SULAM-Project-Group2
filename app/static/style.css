@@ -1,0 +1,274 @@
+/* 1. LOCK THE SCREEN */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden; /* This removes the scrollbar */
+    background-color: #fdf6ec;
+    font-family: sans-serif;
+}
+
+/* 2. CREATE THE TWO-COLUMN LAYOUT */
+.dashboard-wrapper {
+    display: flex;
+    height: 100vh;
+    padding: 10px;
+    gap: 15px;
+}
+
+.left-panel {
+    flex: 3; 
+    display: flex;
+    flex-direction: column;
+}
+
+.right-panel {
+    flex: 1; /* Takes 20% space */
+    display: flex;
+    flex-direction: column;
+}
+
+/* 3. MAKE BOXES FILL THE HEIGHT */
+.middle-container, .bottom-container {
+    flex: 1; /* This forces charts to stretch to fill empty space */
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.chart-box {
+    background: white;
+    border: 1px solid #ccc;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* SIDEBAR STYLING */
+.right-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.sidebar-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Two columns */
+    grid-template-rows: 2fr 1fr;    /* Top is taller than bottom row */
+    gap: 12px;
+    flex-grow: 1; /* Fills the middle space */
+    padding: 15px 0;
+}
+
+.small-box-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.site-box {
+    border-radius: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.7rem;
+    text-align: center;
+    overflow: hidden;  /* Prevents image corners from sticking out */
+    padding: 0;        /* Remove padding so the image touches the edges */
+    position: relative;
+    cursor: pointer; /* This turns the mouse arrow into a clicking hand */
+    transition: transform 0.1s ease-in-out;
+    user-select: none; /* Prevents the text from being highlighted when double-clicking */
+}
+
+.site-box:hover {
+    transform: scale(1.03); /* Slight zoom in */
+    filter: brightness(1.1); /* Make it glow slightly */
+}
+.site-box:active {
+    transform: scale(0.95); /* This makes the box "shrink" slightly when pressed */
+}
+
+.image-label {
+    position: absolute;   /* This lets it float */
+    bottom: 0;            /* Stick to the bottom */
+    left: 0;
+    width: 100%;          /* Stretch across the box */
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.4); /* Dark see-through background */
+    color: white;         /* White text so it's readable */
+    font-size: 0.75rem;
+    text-align: center;
+    font-weight: bold;
+    pointer-events: none; /* Makes sure the label doesn't block clicks */
+}
+
+/* Specific colors */
+.bwm { border:1px solid #f39c12; flex: 1; }
+.suffolk-house { border:1px solid #c06ceb; flex: 1; }
+.stadium-merdeka { border:1px solid #5ce1e6; }
+.heren-street { border:1px solid #ff3131; }
+.rumah { border:1px solid #5d26ff; }
+/* The tall box takes up two rows of the grid */
+.tallest {
+    grid-row: span 1.5; 
+}
+.shorter {
+    grid-column: span 0.5;
+}
+.longer {
+    grid-column: span 1.5;
+}
+/* This controls the image inside the box */
+.site-box img {
+    width: 100%;       /* Fill the width of the box */
+    height: 100%;      /* Fill the height of the box */
+    object-fit: cover; /* This crops the image so it fits without stretching */
+    display: block;
+}
+
+/* Contact box at the bottom */
+.contact-info {
+    background-color: #003b5c; /* Dark Navy */
+    color: white;
+    padding: 45px;
+    font-size: 0.60rem;
+    line-height: 1.5;
+    border-radius: 20px;
+    text-align: center;
+}
+
+.contact-info {
+    background: #00334d;
+    color: white;
+    padding: 10px;
+    font-size: 0.7rem;
+    border-radius: 5px;
+}
+
+.summary-container {
+    display: flex;
+    justify-content: space-between;
+    gap: 15px;
+    height: 15vh; /* Takes up 15% of the screen height */
+    margin-bottom: 10px;
+}
+
+.card {
+    flex: 1;
+    background: #fffcf7; /* Slight off-white */
+    border: 2px solid #006666;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.card-header {
+    background-color: #006666;
+    color: white;
+    padding: 5px;
+    text-align: center;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+.card-body {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+}
+
+.icon-circle {
+    width: 50px;
+    height: 50px;
+    border: 2px solid #006666;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+
+.number {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #004d4d;
+}
+.main-header {
+    background-color: #fffcf7;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 10vh; /* Fixed height for the header */
+    padding: 0 10px;
+    margin: auto 0 10px 0;
+}
+
+.header-left, .header-right {
+    flex: 1; /* These take up equal space to keep the title centered */
+}
+
+.logo-box img {
+    height: 40px; /* Adjust based on your logo size */
+    border: none;
+    padding: 2px;
+}
+
+.header-center {
+    flex: 2; /* Gives more room for the title */
+    text-align: center;
+}
+
+.header-center h1 {
+    font-size: 2.5rem;
+    color: #006666;
+    letter-spacing: 2px;
+}
+
+.header-right {
+    text-align: right;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.kpi-info {
+    font-size: 0.75rem;
+    color: #333;
+    max-width: 200px;
+    position: relative;
+}
+
+.arrow-icon {
+    font-size: 2rem;
+    color: #008b8b;
+    display: block;
+}
+
+.left-section-header {
+    background: #0f86c26c;
+    color: white;
+    text-align: center;
+    padding: 7px;
+    margin-bottom: 5px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    border-radius: 5px;
+}
+
+.right-section-header {
+    background: #0f86c26c;
+    color: white;
+    text-align: center;
+    padding: 10px;
+    margin: 2px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    border-radius: 5px;
+}

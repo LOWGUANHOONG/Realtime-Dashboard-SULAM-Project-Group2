@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>BWM Data Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="dashboard-wrapper">
+    <main class="left-panel">
+        <header class="main-header">
+    <div class="header-left">
+        <div class="logo-box">
+            <img src="./images/badanwarisanlogo_colour-1.png" alt="Logo">
+        </div>
+    </div>
+
+    <div class="header-center">
+        <h1>Data Dashboard</h1>
+    </div>
+
+    <div class="header-right">
+        <div class="kpi-info">
+            <p>Track key performance indicators and sales activities</p>
+            <span class="arrow-icon">↗</span>
+        </div>
+    </div>
+</header>
+
+        <div class="summary-container">
+    <div class="card">
+        <div class="card-header">COUNCIL MEMBER</div>
+        <div class="card-body">
+            <div class="icon-circle"><img src="./images/council member.jpg" alt="Council Icon" class="icon-circle"></div>
+            <div class="number" id="council-count">500</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">MEMBERSHIPS</div>
+        <div class="card-body">
+            <div class="icon-circle"><img src="./images/membership.png" alt="Council Icon" class="icon-circle"></div>
+            <div class="number" id="member-count">75,000</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">MEMBERSHIP GROWTH</div>
+        <div class="card-body">
+            <div class="icon-circle">📈</div>
+            <div class="number" id="growth-rate">12%</div>
+        </div>
+    </div>
+</div>
+
+        <div class="left-section-header">MEMBERSHIP DEMOGRAPHIC</div>
+        <div class="middle-container">
+            <div class="chart-box">Chart Placeholder</div>
+            <div class="chart-box">Select Box Placeholder</div>
+        </div>
+
+        <div class="left-section-header">ORGANISATION DATA</div>
+        <div class="bottom-container">
+            <div class="chart-box full-width">Line Chart Placeholder</div>
+        </div>
+    </main>
+
+<aside class="right-panel">
+    <div class="right-section-header">CULTURAL SITE</div>
+    
+<div class="sidebar-grid">
+    <div class="small-box-group"> 
+        <div class="site-box bwm shorter"
+          onclick="updateDashboard('bwm')" 
+          role="button" 
+          tabindex="0">
+          <img src="./images/bwm.jpg" alt="bwm"><div class="image-label">BWM</div>
+        </div>
+      
+        <div class="site-box suffolk-house"
+          onclick="updateDashboard('suffolk-house')" 
+          role="button" 
+          tabindex="0">
+          <img src="./images/suffolk house.jpg" alt="Suffolk House"><div class="image-label">Suffolk House</div>
+        </div>
+    </div>
+
+    <div class="site-box stadium-merdeka tallest" 
+        onclick="updateDashboard('stadium-merdeka')" 
+        role="button" 
+        tabindex="0">
+        <img src="./images/stadium merdeka.jpg" alt="Stadium Merdeka"><div class="image-label">Stadium Merdeka</div>
+      </div>
+
+    <div class="site-box heren-street" 
+      onclick="updateDashboard('heren-street')" 
+          role="button" 
+          tabindex="0">
+          <img src="./images/no 8 heeren street.jpg" alt="No 8 Heeren Street"><div class="image-label">No 8 Heeren Street</div>
+      </div>
+
+    <div class="site-box rumah longer" onclick="updateDashboard('rumah')" 
+          role="button" 
+          tabindex="0">
+          <img src="./images/rumah penghulu abu seman.jpg" alt="Rumah Penghulu Abu Seman" ><div class="image-label">Rumah Penghulu Abu Seman</div>
+      </div>
+    
+</div>
+    <div class="contact-info">
+        <p><strong>FOR MORE DETAIL:</strong></p>
+        <p>NO.2, JALAN STONOR, 50450 KUALA LUMPUR</p>
+        <p>OFFICE: +603-2144 9273</p>
+        <p>OPENING HOURS: 10AM-5PM (TUESDAYS - SATURDAYS)</p>
+        <p>CLOSED ON PUBLIC HOLIDAYS</p>
+    </div>
+</aside>
+</div>
+</body>
+<script src="script.js"></script>
+</html>
