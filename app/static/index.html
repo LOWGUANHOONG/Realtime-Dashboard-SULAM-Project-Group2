@@ -27,43 +27,101 @@
     </div>
 </header>
 
-        <div class="summary-container">
+       <div class="summary-container">
+    
     <div class="card">
-        <div class="card-header">COUNCIL MEMBER</div>
+        <div class="card-header" id="info-box-1-title">COUNCIL MEMBER</div>
         <div class="card-body">
-            <div class="icon-circle"><img src="./images/council member.jpg" alt="Council Icon" class="icon-circle"></div>
-            <div class="number" id="council-count">500</div>
+            <div id="icon-1" class="icon-circle">
+                <img src="./images/council member.jpg" alt="icon" style="width: 60%; height: 60%; object-fit: contain;">
+            </div>
+            <div class="number" id="info-box-1-value">500</div>
         </div>
     </div>
 
     <div class="card">
-        <div class="card-header">MEMBERSHIPS</div>
+        <div class="card-header" id="info-box-2-title">MEMBERSHIPS</div>
         <div class="card-body">
-            <div class="icon-circle"><img src="./images/membership.png" alt="Council Icon" class="icon-circle"></div>
-            <div class="number" id="member-count">75,000</div>
+            <div id="icon-2" class="icon-circle">
+                <img src="./images/membership.png" alt="icon" style="width: 60%; height: 60%; object-fit: contain;">
+            </div>
+            <div class="number" id="info-box-2-value">75,000</div>
         </div>
     </div>
 
     <div class="card">
-        <div class="card-header">MEMBERSHIP GROWTH</div>
+        <div class="card-header" id="info-box-3-title">MEMBERSHIP GROWTH</div>
         <div class="card-body">
-            <div class="icon-circle">📈</div>
-            <div class="number" id="growth-rate">12%</div>
+            <div id="icon-3" class="icon-circle">📈</div>
+            <div class="number" id="info-box-3-value">12%</div>
+        </div>
+    </div>
+
+</div>
+
+    <div class="left-section-header">MEMBERSHIP DEMOGRAPHIC</div>
+    <div class="middle-container">
+    
+    <div class="chart-box" style="position: relative; height: 250px;">
+        <canvas id="demographicBarChart"></canvas>
+    </div>
+
+    <div class="chart-box" style="position: relative; height: 250px; display: flex; flex-direction: column;">
+        <div style="width: 100%; text-align: right; padding-bottom: 5px; padding-right: 10px;">
+            <label for="demographicFilter" style="font-weight: bold; font-size: 12px; margin-right: 5px;">Filter By:</label>
+            <select id="demographicFilter" style="padding: 4px; border-radius: 4px; font-size: 12px; cursor: pointer;">
+                <option value="age">Age Group</option>
+                <option value="gender">Gender</option>
+            </select>
+        </div>
+
+        <div style="position: relative; flex-grow: 1; width: 100%; overflow: hidden;">
+            <canvas id="demographicPieChart"></canvas>
         </div>
     </div>
 </div>
+   
+<div class="left-section-header">ORGANISATION DATA</div>
+    <div class="bottom-container" style="position: relative;">
 
-        <div class="left-section-header">MEMBERSHIP DEMOGRAPHIC</div>
-        <div class="middle-container">
-            <div class="chart-box">Chart Placeholder</div>
-            <div class="chart-box">Select Box Placeholder</div>
+    <button id="resetBtn" onclick="showOverview()" 
+        style="display: none; position: absolute; top: 5px; right: 5px; z-index: 100; 
+               padding: 2px 6px; font-size: 10px; font-weight: bold; 
+               background: rgba(255, 255, 255, 0.8); border: 1px solid #ccc; 
+               border-radius: 3px; cursor: pointer;">
+        ✕ Reset
+    </button>
+    
+    <div id="overview-panel" class="chart-box full-width" style="position: relative; height: 300px;">
+        <canvas id="membershipTrendChart"></canvas>
+    </div>
+
+    <div id="detail-panel" style="display: none; width: 100%; height: 300px; gap: 10px;">
+        
+        <div class="chart-box" style="flex: 1; position: relative; display: flex; flex-direction: column;">
+            <h4 style="margin: 5px 0; font-size: 13px; text-align: center; color: #366d75;">Donations</h4>
+            <div style="flex-grow: 1; position: relative; width: 100%;">
+                <canvas id="donationChart"></canvas>
+            </div>
         </div>
 
-        <div class="left-section-header">ORGANISATION DATA</div>
-        <div class="bottom-container">
-            <div class="chart-box full-width">Line Chart Placeholder</div>
+        <div class="chart-box" style="flex: 1; position: relative; display: flex; flex-direction: column;">
+            <h4 style="margin: 5px 0; font-size: 13px; text-align: center; color: #366d75;">Volunteers</h4>
+            <div style="flex-grow: 1; position: relative; width: 100%;">
+                <canvas id="volunteerChart"></canvas>
+            </div>
         </div>
-    </main>
+
+        <div class="chart-box" style="flex: 1; position: relative; display: flex; flex-direction: column;">
+            <h4 style="margin: 5px 0; font-size: 13px; text-align: center; color: #366d75;">Sponsorships</h4>
+            <div style="flex-grow: 1; position: relative; width: 100%;">
+                <canvas id="sponsorshipChart"></canvas>
+            </div>
+        </div>
+
+    </div>
+</div>
+</main>
 
 <aside class="right-panel">
     <div class="right-section-header">CULTURAL SITE</div>
@@ -116,5 +174,6 @@
 </aside>
 </div>
 </body>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="script.js"></script>
 </html>
