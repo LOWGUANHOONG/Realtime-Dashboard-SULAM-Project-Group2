@@ -2,12 +2,13 @@
 // PART 1: DATA & GLOBALS
 // ==========================================
 
-let detailCharts = [];      // Stores the 3 small charts
-let mainOverviewChart = null; // Stores the big Overview chart
+let chart1Instance = null;
+let chart2Instance = null;
+let chart3Instance = null;
 
 const siteData = {
-    "bwm": {
-        title: "Barisan Warisan Malaysia",
+    "heritage-centre": {
+        title: "Heritage Centre",
         council: 120, members: "15,000", growth: "5%",
         donations: [10, 20, 35, 50, 70],
         volunteers: [5, 15, 20, 25, 30],
@@ -44,82 +45,58 @@ const siteData = {
 };
 
 // ==========================================
-// PART 2: INTERACTION FUNCTIONS (MIXED MODE)
+// PART 2: INTERACTION FUNCTIONS
 // ==========================================
 
 function updateDashboard(siteKey) {
     const data = siteData[siteKey];
     if (!data) return;
 
-    // 1. Update Main Title
-    document.querySelector('.header-center h1').innerText = data.title;
+    // Update active state for site boxes
+    document.querySelectorAll('.site-box').forEach(box => box.classList.remove('active'));
+    const activeBox = document.querySelector(`.site-box[onclick*="${siteKey}"]`);
+    if (activeBox) activeBox.classList.add('active');
 
-    // 2. CONDITIONAL TOP SECTION
-    if (siteKey === 'bwm') {
-        // --- CASE 1: BWM (Default Mixed Mode) ---
-        
-        // Box 1: Image
-        document.getElementById('info-box-1-title').innerText = "COUNCIL MEMBER";
-        document.getElementById('icon-1').innerHTML = '<img src="./images/council member.jpg" style="width:60%; height:60%; object-fit:contain;">';
-        document.getElementById('info-box-1-value').innerText = data.council;
+    // Update section header with site name
+    document.getElementById('section-header-1').innerText = data.title.toUpperCase();
 
-        // Box 2: Image
-        document.getElementById('info-box-2-title').innerText = "MEMBERSHIPS";
-        document.getElementById('icon-2').innerHTML = '<img src="./images/membership.png" style="width:60%; height:60%; object-fit:contain;">';
-        document.getElementById('info-box-2-value').innerText = data.members;
+    // Update info cards
+    const latestDonation = data.donations[data.donations.length - 1] + "k";
+    const latestVolunteer = data.volunteers[data.volunteers.length - 1];
+    const latestSponsorship = data.sponsorships[data.sponsorships.length - 1] + "k";
 
-        // Box 3: EMOJI (📈)
-        document.getElementById('info-box-3-title').innerText = "MEMBERSHIP GROWTH";
-        document.getElementById('icon-3').innerText = "📈"; // Just text for emoji
-        document.getElementById('info-box-3-value').innerText = data.growth;
+    document.getElementById('info-box-1-title').innerText = "LATEST DONATIONS";
+    document.getElementById('icon-1').innerHTML = '<img src="./images/donations.png" style="width:50%; height:50%; object-fit:contain;">';
+    document.getElementById('info-box-1-value').innerText = latestDonation;
 
-    } else {
-        // --- CASE 2: OTHER SITES (All Images) ---
-        
-        const latestDonation = data.donations[data.donations.length - 1] + "k";
-        const latestVolunteer = data.volunteers[data.volunteers.length - 1];
-        const latestSponsorship = data.sponsorships[data.sponsorships.length - 1] + "k";
+    document.getElementById('info-box-2-title').innerText = "ACTIVE VOLUNTEERS";
+    document.getElementById('icon-2').innerHTML = '<img src="./images/volunteers.png" style="width:60%; height:60%; object-fit:contain;">';
+    document.getElementById('info-box-2-value').innerText = latestVolunteer;
 
-        // Box 1: Donations (Image)
-        document.getElementById('info-box-1-title').innerText = "LATEST DONATIONS";
-        document.getElementById('icon-1').innerHTML = '<img src="./images/donations.png" style="width:60%; height:60%; object-fit:contain;">';
-        document.getElementById('info-box-1-value').innerText = latestDonation;
+    document.getElementById('info-box-3-title').innerText = "LATEST SPONSORSHIPS";
+    document.getElementById('icon-3').innerHTML = '<img src="./images/sponsorships.png" style="width:60%; height:60%; object-fit:contain;">';
+    document.getElementById('info-box-3-value').innerText = latestSponsorship;
 
-        // Box 2: Volunteers (Image)
-        document.getElementById('info-box-2-title').innerText = "ACTIVE VOLUNTEERS";
-        document.getElementById('icon-2').innerHTML = '<img src="./images/volunteers.png" style="width:60%; height:60%; object-fit:contain;">';
-        document.getElementById('info-box-2-value').innerText = latestVolunteer;
+    // Hide filter dropdown for site-specific view
+    const filterContainer = document.getElementById('filter-container');
+    if (filterContainer) filterContainer.style.display = 'none';
 
-        // Box 3: Sponsorships (Image - Switched from Emoji!)
-        document.getElementById('info-box-3-title').innerText = "LATEST SPONSORSHIPS";
-        document.getElementById('icon-3').innerHTML = '<img src="./images/sponsorships.png" style="width:60%; height:60%; object-fit:contain;">';
-        document.getElementById('info-box-3-value').innerText = latestSponsorship;
-    }
-
-    // 3. Update Bottom Section & Charts
-    if(data.stats) {
-        document.getElementById('stat-donations').innerText = data.stats.donations;
-        document.getElementById('stat-sponsorships').innerText = data.stats.sponsorships;
-        document.getElementById('stat-volunteers').innerText = data.stats.volunteers;
-    }
-    
-    document.getElementById('overview-panel').style.display = 'none';
-    document.getElementById('detail-panel').style.display = 'flex';
-    document.getElementById('resetBtn').style.display = 'block';
-
-    renderDetailCharts(data);
+    // Render site-specific charts
+    renderSiteCharts(data);
 }
 
 function showOverview() {
-    // Reset Views
-    document.getElementById('overview-panel').style.display = 'block';
-    document.getElementById('detail-panel').style.display = 'none';
-    document.getElementById('resetBtn').style.display = 'none';
-    document.querySelector('.header-center h1').innerText = "Data Dashboard";
+    // Update active state for BWM site box
+    document.querySelectorAll('.site-box').forEach(box => box.classList.remove('active'));
+    const bwmBox = document.querySelector('.site-box.new-site');
+    if (bwmBox) bwmBox.classList.add('active');
 
-    // --- RESET TO DEFAULT (Mixed Mode) ---
+    // Reset section header
+    document.getElementById('section-header-1').innerText = "ORGANISATION DATA";
+
+    // Reset info cards
     document.getElementById('info-box-1-title').innerText = "COUNCIL MEMBER";
-    document.getElementById('icon-1').innerHTML = '<img src="./images/council member.jpg" style="width:60%; height:60%; object-fit:contain;">';
+    document.getElementById('icon-1').innerHTML = '<img src="./images/council member.jpg" style="width:50%; height:50%; object-fit:contain;">';
     document.getElementById('info-box-1-value').innerText = "500";
 
     document.getElementById('info-box-2-title').innerText = "MEMBERSHIPS";
@@ -127,51 +104,177 @@ function showOverview() {
     document.getElementById('info-box-2-value').innerText = "75,000";
 
     document.getElementById('info-box-3-title').innerText = "MEMBERSHIP GROWTH";
-    document.getElementById('icon-3').innerText = "📈"; // Reset to Emoji
-    document.getElementById('info-box-3-value').innerText = "12%";
+    document.getElementById('icon-3').innerHTML = '<span style="font-size: 1.2rem;">📈</span>';
+    document.getElementById('info-box-3-value').innerText = "+12%";
 
-    if (mainOverviewChart) {
-        mainOverviewChart.data.datasets.forEach(ds => ds.hidden = false);
-        mainOverviewChart.update();
-    }
+    // Show filter dropdown
+    const filterContainer = document.getElementById('filter-container');
+    if (filterContainer) filterContainer.style.display = 'block';
+
+    // Render overview charts
+    renderOverviewCharts();
 }
 
-function renderDetailCharts(data) {
+function renderSiteCharts(data) {
     const years = ['2021', '2022', '2023', '2024', '2025'];
-    const ctxDonation = document.getElementById('donationChart');
-    const ctxVolunteer = document.getElementById('volunteerChart');
-    const ctxSponsor = document.getElementById('sponsorshipChart');
 
-    detailCharts.forEach(chart => chart.destroy());
-    detailCharts = [];
+    // Destroy existing charts
+    if (chart1Instance) chart1Instance.destroy();
+    if (chart2Instance) chart2Instance.destroy();
+    if (chart3Instance) chart3Instance.destroy();
 
-    const createConfig = (label, datasetData, color) => ({
+    // Chart 1: Donations (line chart)
+    const ctx1 = document.getElementById('chart1');
+    chart1Instance = new Chart(ctx1, {
         type: 'line',
         data: {
             labels: years,
             datasets: [{
-                label: label,
-                data: datasetData,
-                borderColor: color,
-                backgroundColor: color,
+                label: 'Donations',
+                data: data.donations,
+                borderColor: '#366d75',
+                backgroundColor: '#366d75',
                 tension: 0.3,
-                pointRadius: 4
+                pointRadius: 5,
+                borderWidth: 3
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
+            plugins: {
+                title: { display: true, text: 'DONATIONS TREND' },
+                legend: { display: false }
+            },
             scales: {
-                x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-                y: { beginAtZero: true, ticks: { font: { size: 10 } } }
+                x: { grid: { display: false } },
+                y: { beginAtZero: true }
             }
         }
     });
 
-    detailCharts.push(new Chart(ctxDonation, createConfig("Donations", data.donations, '#366d75')));
-    detailCharts.push(new Chart(ctxVolunteer, createConfig("Volunteers", data.volunteers, '#68d3d8')));
-    detailCharts.push(new Chart(ctxSponsor, createConfig("Sponsorships", data.sponsorships, '#4a6fa5')));
+    // Chart 2: Volunteers (line chart)
+    const ctx2 = document.getElementById('chart2');
+    chart2Instance = new Chart(ctx2, {
+        type: 'line',
+        data: {
+            labels: years,
+            datasets: [{
+                label: 'Volunteers',
+                data: data.volunteers,
+                borderColor: '#68d3d8',
+                backgroundColor: '#68d3d8',
+                tension: 0.3,
+                pointRadius: 5,
+                borderWidth: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: { display: true, text: 'VOLUNTEERS TREND' },
+                legend: { display: false }
+            },
+            scales: {
+                x: { grid: { display: false } },
+                y: { beginAtZero: true }
+            }
+        }
+    });
+
+    // Chart 3: Sponsorships (line chart)
+    const ctx3 = document.getElementById('chart3');
+    chart3Instance = new Chart(ctx3, {
+        type: 'line',
+        data: {
+            labels: years,
+            datasets: [{
+                label: 'Sponsorships',
+                data: data.sponsorships,
+                borderColor: '#4a6fa5',
+                backgroundColor: '#4a6fa5',
+                tension: 0.3,
+                pointRadius: 5,
+                borderWidth: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: { display: true, text: 'SPONSORSHIPS TREND' },
+                legend: { display: false }
+            },
+            scales: {
+                x: { grid: { display: false } },
+                y: { beginAtZero: true }
+            }
+        }
+    });
+}
+
+function renderOverviewCharts() {
+    // Destroy existing charts
+    if (chart1Instance) chart1Instance.destroy();
+    if (chart2Instance) chart2Instance.destroy();
+    if (chart3Instance) chart3Instance.destroy();
+
+    // Chart 1: Bar Chart
+    const ctx1 = document.getElementById('chart1');
+    chart1Instance = new Chart(ctx1, {
+        type: 'bar',
+        data: {
+            labels: ['2021', '2022', '2023', '2024', '2025'],
+            datasets: [
+                { label: 'Membership Only', data: [320, 350, 380, 420, 450], backgroundColor: '#68d3d8', barPercentage: 0.6, categoryPercentage: 0.7 },
+                { label: 'Council Member', data: [40, 45, 50, 55, 60], backgroundColor: '#4a6fa5', barPercentage: 0.6, categoryPercentage: 0.7 }
+            ]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
+                title: { display: true, text: 'MEMBERSHIP COMPOSITION' }
+            },
+            scales: {
+                x: { stacked: true, grid: { display: false } },
+                y: { stacked: true, grid: { display: false }, ticks: { autoSkip: false, font: { weight: 'bold' } } }
+            }
+        }
+    });
+
+    // Chart 2: Pie Chart (will be initialized by renderPieChart function)
+    renderPieChart('age');
+
+    // Chart 3: Membership Trend Chart
+    const ctx3 = document.getElementById('chart3');
+    chart3Instance = new Chart(ctx3, {
+        type: 'line',
+        data: {
+            labels: ['2021', '2022', '2023', '2024', '2025'],
+            datasets: [
+                { label: 'BWM', data: [120, 150, 200, 280, 350], borderColor: '#366d75', tension: 0.4, pointRadius: 4, borderWidth: 3 },
+                { label: 'Stadium Merdeka', data: [100, 130, 180, 240, 310], borderColor: '#4a6fa5', tension: 0.4, pointRadius: 4, borderWidth: 3 },
+                { label: 'Suffolk House', data: [80, 100, 140, 190, 250], borderColor: '#68d3d8', tension: 0.4, pointRadius: 4, borderWidth: 3 },
+                { label: 'No 8 Heeren St', data: [40, 60, 90, 120, 160], borderColor: '#8884d8', tension: 0.4, pointRadius: 4, borderWidth: 3 },
+                { label: 'Rumah Penghulu', data: [20, 35, 50, 80, 110], borderColor: '#999999', tension: 0.4, pointRadius: 4, borderWidth: 3 }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                title: { display: true, text: 'CULTURAL SITES GROWTH (OVERVIEW)' },
+                legend: { position: 'top', labels: { boxWidth: 10 } }
+            },
+            scales: {
+                x: { grid: { display: false } }
+            }
+        }
+    });
 }
 
 // ==========================================
@@ -179,72 +282,62 @@ function renderDetailCharts(data) {
 // ==========================================
 
 document.addEventListener("DOMContentLoaded", function () {
+    // Initialize with overview charts
+    renderOverviewCharts();
 
-    // --- 1. OVERVIEW CHART (Save to global variable) ---
-    const ctxMembership = document.getElementById('membershipTrendChart');
-    if (ctxMembership) {
-        mainOverviewChart = new Chart(ctxMembership, {
-            type: 'line',
-            data: {
-                labels: ['2021', '2022', '2023', '2024', '2025'], 
-                datasets: [
-                    { label: 'BWM', data: [120, 150, 200, 280, 350], borderColor: '#366d75', tension: 0.4, pointRadius: 4, borderWidth: 3 },
-                    { label: 'Stadium Merdeka', data: [100, 130, 180, 240, 310], borderColor: '#4a6fa5', tension: 0.4, pointRadius: 4, borderWidth: 3 },
-                    { label: 'Suffolk House', data: [80, 100, 140, 190, 250], borderColor: '#68d3d8', tension: 0.4, pointRadius: 4, borderWidth: 3 },
-                    { label: 'No 8 Heeren St', data: [40, 60, 90, 120, 160], borderColor: '#8884d8', tension: 0.4, pointRadius: 4, borderWidth: 3 },
-                    { label: 'Rumah Penghulu', data: [20, 35, 50, 80, 110], borderColor: '#999999', tension: 0.4, pointRadius: 4, borderWidth: 3 }
-                ]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false, 
-                plugins: { title: { display: true, text: 'CULTURAL SITES GROWTH (OVERVIEW)' }, legend: { position: 'top', labels: { boxWidth: 10 } } },
-                scales: { x: { grid: { display: false } } }
-            }
-        });
-    }
-
-    // --- 2. BAR CHART ---
-    const ctxDemographic = document.getElementById('demographicBarChart');
-    if (ctxDemographic) {
-        new Chart(ctxDemographic, {
-            type: 'bar',
-            data: {
-                labels: ['2021', '2022', '2023', '2024', '2025'], 
-                datasets: [
-                    { label: 'Membership Only', data: [320, 350, 380, 420, 450], backgroundColor: '#68d3d8', barPercentage: 0.6, categoryPercentage: 0.7 },
-                    { label: 'Council Member', data: [40, 45, 50, 55, 60], backgroundColor: '#4a6fa5', barPercentage: 0.6, categoryPercentage: 0.7 }
-                ]
-            },
-            options: {
-                indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } }, title: { display: true, text: 'MEMBERSHIP COMPOSITION' } },
-                scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, grid: { display: false }, ticks: { autoSkip: false, font: { weight: 'bold' } } } }
-            }
-        });
-    }
-
-    // --- 3. PIE CHART ---
-    const pieData = {
-        age: { labels: ['<18', '18-24', '25-34', '35-44', '45+'], data: [15, 25, 30, 20, 10], colors: ['#366d75', '#68d3d8', '#4a6fa5', '#8884d8', '#cccccc'] },
-        gender: { labels: ['Male', 'Female'], data: [45, 55], colors: ['#366d75', '#68d3d8'] }
-    };
-
-    let pieChartInstance = null;
-    function renderPieChart(filterType) {
-        const ctxPie = document.getElementById('demographicPieChart');
-        if (!ctxPie) return;
-        const selectedData = pieData[filterType];
-        if (pieChartInstance) pieChartInstance.destroy();
-        pieChartInstance = new Chart(ctxPie, {
-            type: 'doughnut',
-            data: { labels: selectedData.labels, datasets: [{ data: selectedData.data, backgroundColor: selectedData.colors, borderWidth: 0 }] },
-            options: {
-                responsive: true, maintainAspectRatio: false, layout: { padding: 0 },
-                plugins: { legend: { position: 'right', labels: { boxWidth: 10 } }, title: { display: true, text: filterType === 'age' ? 'MEMBER AGE' : 'MEMBER GENDER' } }
-            }
-        });
-    }
-    renderPieChart('age');
+    // Set up filter dropdown event listener
     const dropdown = document.getElementById('demographicFilter');
-    if (dropdown) dropdown.addEventListener('change', function() { renderPieChart(this.value); });
+    if (dropdown) {
+        dropdown.addEventListener('change', function() {
+            renderPieChart(this.value);
+        });
+    }
 });
+
+// Pie chart rendering function
+const pieData = {
+    age: {
+        labels: ['<18', '18-24', '25-34', '35-44', '45+'],
+        data: [15, 25, 30, 20, 10],
+        colors: ['#366d75', '#68d3d8', '#4a6fa5', '#8884d8', '#cccccc']
+    },
+    gender: {
+        labels: ['Male', 'Female'],
+        data: [45, 55],
+        colors: ['#366d75', '#68d3d8']
+    }
+};
+
+function renderPieChart(filterType) {
+    const ctx2 = document.getElementById('chart2');
+    if (!ctx2) return;
+
+    const selectedData = pieData[filterType];
+
+    // Destroy existing chart2 if it exists
+    if (chart2Instance) chart2Instance.destroy();
+
+    chart2Instance = new Chart(ctx2, {
+        type: 'doughnut',
+        data: {
+            labels: selectedData.labels,
+            datasets: [{
+                data: selectedData.data,
+                backgroundColor: selectedData.colors,
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: { padding: 0 },
+            plugins: {
+                legend: { position: 'right', labels: { boxWidth: 10 } },
+                title: {
+                    display: true,
+                    text: filterType === 'age' ? 'MEMBER AGE' : 'MEMBER GENDER'
+                }
+            }
+        }
+    });
+}

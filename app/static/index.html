@@ -6,9 +6,8 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="dashboard-wrapper">
-    <main class="left-panel">
-        <header class="main-header">
+
+<header class="main-header">
     <div class="header-left">
         <div class="logo-box">
             <img src="./images/badanwarisanlogo_colour-1.png" alt="Logo">
@@ -16,16 +15,13 @@
     </div>
 
     <div class="header-center">
-        <h1>Data Dashboard</h1>
-    </div>
-
-    <div class="header-right">
-        <div class="kpi-info">
-            <p>Track key performance indicators and sales activities</p>
-            <span class="arrow-icon">↗</span>
-        </div>
+        <h1>Real-time Community Contribution Dashboard</h1>
     </div>
 </header>
+
+<div class="dashboard-wrapper">
+    <main class="left-panel">
+
 
        <div class="summary-container">
     
@@ -33,7 +29,7 @@
         <div class="card-header" id="info-box-1-title">COUNCIL MEMBER</div>
         <div class="card-body">
             <div id="icon-1" class="icon-circle">
-                <img src="./images/council member.jpg" alt="icon" style="width: 60%; height: 60%; object-fit: contain;">
+                <img src="./images/council member.jpg" alt="icon" style="width: 50%; height: 50%; object-fit: contain;">
             </div>
             <div class="number" id="info-box-1-value">500</div>
         </div>
@@ -52,22 +48,22 @@
     <div class="card">
         <div class="card-header" id="info-box-3-title">MEMBERSHIP GROWTH</div>
         <div class="card-body">
-            <div id="icon-3" class="icon-circle">📈</div>
-            <div class="number" id="info-box-3-value">12%</div>
+            <div id="icon-3" class="icon-circle"><span style="font-size: 1.2rem;">📈</span></div>
+            <div class="number" id="info-box-3-value">+12%</div>
         </div>
     </div>
 
 </div>
 
-    <div class="left-section-header">MEMBERSHIP DEMOGRAPHIC</div>
+    <div class="left-section-header" id="section-header-1">ORGANISATION DATA</div>
     <div class="middle-container">
     
     <div class="chart-box" style="position: relative; height: 250px;">
-        <canvas id="demographicBarChart"></canvas>
+        <canvas id="chart1"></canvas>
     </div>
 
     <div class="chart-box" style="position: relative; height: 250px; display: flex; flex-direction: column;">
-        <div style="width: 100%; text-align: right; padding-bottom: 5px; padding-right: 10px;">
+        <div id="filter-container" style="width: 100%; text-align: right; padding-bottom: 5px; padding-right: 10px;">
             <label for="demographicFilter" style="font-weight: bold; font-size: 12px; margin-right: 5px;">Filter By:</label>
             <select id="demographicFilter" style="padding: 4px; border-radius: 4px; font-size: 12px; cursor: pointer;">
                 <option value="age">Age Group</option>
@@ -75,94 +71,68 @@
             </select>
         </div>
 
-        <div style="position: relative; flex-grow: 1; width: 100%; overflow: hidden;">
-            <canvas id="demographicPieChart"></canvas>
+        <div style="position: relative; flex-grow: 1; width: 100%; overflow: hidden; margin-top: 0px; margin-bottom: 20px; padding-top: 10px;">
+            <canvas id="chart2"></canvas>
         </div>
     </div>
 </div>
    
-<div class="left-section-header">ORGANISATION DATA</div>
-    <div class="bottom-container" style="position: relative;">
-
-    <button id="resetBtn" onclick="showOverview()" 
-        style="display: none; position: absolute; top: 5px; right: 5px; z-index: 100; 
-               padding: 2px 6px; font-size: 10px; font-weight: bold; 
-               background: rgba(255, 255, 255, 0.8); border: 1px solid #ccc; 
-               border-radius: 3px; cursor: pointer;">
-        ✕ Reset
-    </button>
+    <div class="bottom-container" style="position: relative;">  
     
-    <div id="overview-panel" class="chart-box full-width" style="position: relative; height: 300px;">
-        <canvas id="membershipTrendChart"></canvas>
+    <div class="chart-box full-width" style="position: relative; height: 300px;">
+        <canvas id="chart3"></canvas>
     </div>
 
-    <div id="detail-panel" style="display: none; width: 100%; height: 300px; gap: 10px;">
-        
-        <div class="chart-box" style="flex: 1; position: relative; display: flex; flex-direction: column;">
-            <h4 style="margin: 5px 0; font-size: 13px; text-align: center; color: #366d75;">Donations</h4>
-            <div style="flex-grow: 1; position: relative; width: 100%;">
-                <canvas id="donationChart"></canvas>
-            </div>
-        </div>
-
-        <div class="chart-box" style="flex: 1; position: relative; display: flex; flex-direction: column;">
-            <h4 style="margin: 5px 0; font-size: 13px; text-align: center; color: #366d75;">Volunteers</h4>
-            <div style="flex-grow: 1; position: relative; width: 100%;">
-                <canvas id="volunteerChart"></canvas>
-            </div>
-        </div>
-
-        <div class="chart-box" style="flex: 1; position: relative; display: flex; flex-direction: column;">
-            <h4 style="margin: 5px 0; font-size: 13px; text-align: center; color: #366d75;">Sponsorships</h4>
-            <div style="flex-grow: 1; position: relative; width: 100%;">
-                <canvas id="sponsorshipChart"></canvas>
-            </div>
-        </div>
-
-    </div>
 </div>
 </main>
 
 <aside class="right-panel">
-    <div class="right-section-header">CULTURAL SITE</div>
+    <div class="right-section-header">CULTURAL SITES</div>
     
 <div class="sidebar-grid">
     <div class="small-box-group"> 
-        <div class="site-box bwm shorter"
-          onclick="updateDashboard('bwm')" 
+        <div class="site-box new-site active" onclick="showOverview()" 
+            role="button" 
+            tabindex="0">
+            <img src="./images/bwm.jpg" alt="BWM"><div class="image-label">BWM</div>
+        </div>
+
+        <div class="site-box stadium-merdeka" 
+            onclick="updateDashboard('stadium-merdeka')" 
+            role="button" 
+            tabindex="0">
+            <img src="./images/stadium merdeka.jpg" alt="Stadium Merdeka"><div class="image-label">Stadium Merdeka</div>
+        </div>
+
+        <div class="site-box heren-street" 
+            onclick="updateDashboard('heren-street')" 
+            role="button" 
+            tabindex="0">
+            <img src="./images/no 8 heeren street.jpg" alt="No 8 Heeren Street"><div class="image-label">No 8 Heeren Street</div>
+        </div>
+    </div>
+
+    <div class="small-box-group"> 
+        <div class="site-box bwm"
+          onclick="updateDashboard('heritage-centre')" 
           role="button" 
           tabindex="0">
-          <img src="./images/bwm.jpg" alt="bwm"><div class="image-label">BWM</div>
+          <img src="./images/heritage centre.png" alt="Heritage Centre"><div class="image-label">Heritage Centre</div>
         </div>
-      
+
         <div class="site-box suffolk-house"
           onclick="updateDashboard('suffolk-house')" 
           role="button" 
           tabindex="0">
           <img src="./images/suffolk house.jpg" alt="Suffolk House"><div class="image-label">Suffolk House</div>
         </div>
-    </div>
 
-    <div class="site-box stadium-merdeka tallest" 
-        onclick="updateDashboard('stadium-merdeka')" 
+        <div class="site-box rumah" onclick="updateDashboard('rumah')" 
         role="button" 
         tabindex="0">
-        <img src="./images/stadium merdeka.jpg" alt="Stadium Merdeka"><div class="image-label">Stadium Merdeka</div>
-      </div>
-
-    <div class="site-box heren-street" 
-      onclick="updateDashboard('heren-street')" 
-          role="button" 
-          tabindex="0">
-          <img src="./images/no 8 heeren street.jpg" alt="No 8 Heeren Street"><div class="image-label">No 8 Heeren Street</div>
-      </div>
-
-    <div class="site-box rumah longer" onclick="updateDashboard('rumah')" 
-          role="button" 
-          tabindex="0">
-          <img src="./images/rumah penghulu abu seman.jpg" alt="Rumah Penghulu Abu Seman" ><div class="image-label">Rumah Penghulu Abu Seman</div>
-      </div>
-    
+        <img src="./images/rumah penghulu abu seman.jpg" alt="Rumah Penghulu Abu Seman"><div class="image-label">Rumah Penghulu Abu Seman</div>
+        </div>
+    </div>
 </div>
     <div class="contact-info">
         <p><strong>FOR MORE DETAIL:</strong></p>

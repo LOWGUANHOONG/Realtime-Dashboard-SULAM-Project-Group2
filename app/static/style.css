@@ -7,14 +7,17 @@ html, body {
     overflow: hidden; /* This removes the scrollbar */
     background-color: #fdf6ec;
     font-family: sans-serif;
+    display: flex;
+    flex-direction: column;
 }
 
 /* 2. CREATE THE TWO-COLUMN LAYOUT */
 .dashboard-wrapper {
     display: flex;
-    height: 100vh;
-    padding: 10px;
+    flex: 1;
+    padding: 25px;
     gap: 15px;
+    overflow: hidden;
 }
 
 .left-panel {
@@ -81,47 +84,73 @@ html, body {
     padding: 0;        /* Remove padding so the image touches the edges */
     position: relative;
     cursor: pointer; /* This turns the mouse arrow into a clicking hand */
-    transition: transform 0.1s ease-in-out;
+    transition: all 0.3s ease;
     user-select: none; /* Prevents the text from being highlighted when double-clicking */
+    opacity: 0.4;
+    filter: grayscale(50%);
+}
+
+.site-box.active {
+    opacity: 1;
+    box-shadow: 0 0 15px rgba(0, 163, 163, 0.6);
+    filter: grayscale(0%);
 }
 
 .site-box:hover {
     transform: scale(1.03); /* Slight zoom in */
-    filter: brightness(1.1); /* Make it glow slightly */
+    filter: brightness(1.1) grayscale(20%);
+    opacity: 0.7;
+}
+
+.site-box.active:hover {
+    opacity: 1;
 }
 .site-box:active {
     transform: scale(0.95); /* This makes the box "shrink" slightly when pressed */
 }
 
 .image-label {
-    position: absolute;   /* This lets it float */
-    bottom: 0;            /* Stick to the bottom */
-    left: 0;
-    width: 100%;          /* Stretch across the box */
-    padding: 8px;
-    background: rgba(0, 0, 0, 0.4); /* Dark see-through background */
-    color: white;         /* White text so it's readable */
-    font-size: 0.75rem;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    font-size: 1.1rem;
     text-align: center;
     font-weight: bold;
-    pointer-events: none; /* Makes sure the label doesn't block clicks */
+    pointer-events: none;
+    transition: all 0.4s ease;
+    border-radius: 8px;
+}
+
+.site-box:hover .image-label,
+.site-box.active .image-label {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    transform: translate(0, 0);
+    width: 100%;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.4);
+    font-size: 0.75rem;
+    border-radius: 0;
 }
 
 /* Specific colors */
 .bwm { border:1px solid #f39c12; flex: 1; }
+.heritage-centre { border:1px solid #f39c12; flex: 1; }
 .suffolk-house { border:1px solid #c06ceb; flex: 1; }
-.stadium-merdeka { border:1px solid #5ce1e6; }
-.heren-street { border:1px solid #ff3131; }
-.rumah { border:1px solid #5d26ff; }
+.stadium-merdeka { border:1px solid #5ce1e6; flex: 1; }
+.heren-street { border:1px solid #ff3131; flex: 1; }
+.rumah { border:1px solid #5d26ff; flex: 1; }
+.new-site { border:1px solid #27ae60; flex: 1; }
 /* The tall box takes up two rows of the grid */
-.tallest {
-    grid-row: span 1.5; 
-}
+
 .shorter {
     grid-column: span 0.5;
-}
-.longer {
-    grid-column: span 1.5;
 }
 /* This controls the image inside the box */
 .site-box img {
@@ -148,6 +177,7 @@ html, body {
     padding: 10px;
     font-size: 0.7rem;
     border-radius: 5px;
+    margin-top: -200px;
 }
 
 .summary-container {
@@ -171,7 +201,7 @@ html, body {
 .card-header {
     background-color: #006666;
     color: white;
-    padding: 5px;
+    padding: 9px;
     text-align: center;
     font-size: 0.8rem;
     font-weight: bold;
@@ -186,14 +216,14 @@ html, body {
 }
 
 .icon-circle {
-    width: 40px;
-    height: 40px;
+    width: 30px;
+    height: 30px;
     border: 2px solid #006666;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.5rem;
+    font-size: 1.2rem;
 }
 
 .number {
@@ -204,32 +234,48 @@ html, body {
 .main-header {
     background-color: #fffcf7;
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
-    height: 10vh; /* Fixed height for the header */
-    padding: 0 10px;
-    margin: auto 0 10px 0;
+    height: 80px; /* Fixed height for the header */
+    padding: 0 25px;
+    flex-shrink: 0;
+    border: 2px solid #006666;
+    border-radius: 8px;
+    margin: 15px 25px 0 25px;
+    position: relative;
 }
 
 .header-left, .header-right {
     flex: 1; /* These take up equal space to keep the title centered */
+    position: absolute;
+}
+
+.header-left {
+    left: 25px;
+}
+
+.header-right {
+    right: 25px;
 }
 
 .logo-box img {
-    height: 40px; /* Adjust based on your logo size */
+    height: 50px; /* Adjust based on your logo size */
     border: none;
     padding: 2px;
 }
 
 .header-center {
-    flex: 2; /* Gives more room for the title */
+    flex: none;
     text-align: center;
 }
 
 .header-center h1 {
-    font-size: 2.5rem;
+    font-size: 2.0rem;
+    font-family: cursive;
+    font-weight: 900;
     color: #006666;
-    letter-spacing: 2px;
+    letter-spacing: 1px;
+    margin: 0;
 }
 
 .header-right {
@@ -257,7 +303,8 @@ html, body {
     text-align: center;
     padding: 7px;
     margin-bottom: 5px;
-    font-size: 0.9rem;
+    font-size: 1.2rem;
+    font-family: cursive;
     font-weight: bold;
     border-radius: 5px;
 }
@@ -268,7 +315,8 @@ html, body {
     text-align: center;
     padding: 10px;
     margin: 2px;
-    font-size: 0.9rem;
+    font-size: 1.2rem;
+    font-family: cursive;
     font-weight: bold;
     border-radius: 5px;
 }
