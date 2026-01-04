@@ -21,14 +21,16 @@ def get_dashboard_data():
         # request.args.get is used to capture parameters from the frontend URL
         site_id = request.args.get('site_id') 
         demographic_type = request.args.get('demo_filter', 'age')
+        year = request.args.get('year', type=int)
+        month = request.args.get('month', type=int)
 
         if not site_id:
             # --- LANDING PAGE / BWM OVERVIEW DATA ---
             payload = {
                 "view": "overview",
-                "kpis": get_bwm_kpi_cards(),
+                "kpis": get_bwm_kpi_cards(year, month) if year and month else get_bwm_kpi_cards(),
                 "membership_chart": get_org_membership_chart(),
-                "demographics": get_demographics_chart(demographic_type),
+                "demographics": get_demographics_chart(demographic_type, year, month) if year and month else get_demographics_chart(demographic_type),
                 "master_graph": get_master_contribution_index()
             }
         else:

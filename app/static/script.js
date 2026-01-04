@@ -13,6 +13,17 @@ const siteIdMap = {
     "rumah": 5
 };
 
+// Global variables for date selection
+let selectedYear = 2025;
+let selectedMonth = 1;
+let latestAvailableYear = 2025;
+let latestAvailableMonth = 1;
+let isDateSelectorOpen = false;
+const availableYears = [2021, 2022, 2023, 2024, 2025];
+const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+let chart3ActiveDataIndex = -1;
+let chart3AllData = [];
+
 document.addEventListener("DOMContentLoaded", function () {
     // Ensure the BWM box is active on initial load
     const bwmBox = document.querySelector('.new-site');
@@ -146,6 +157,7 @@ function updateKPICards(kpis, view) {
 function updateDataPeriod(apiData, siteKey) {
     let latestMonth = '';
     let latestYear = '';
+    let latestMonthNum = 0;
 
     // Extract latest month and year from the appropriate data source
     if (siteKey) {
@@ -154,6 +166,7 @@ function updateDataPeriod(apiData, siteKey) {
             const lastChart = apiData.charts[apiData.charts.length - 1];
             latestMonth = lastChart.month_name;
             latestYear = lastChart.year;
+            latestMonthNum = lastChart.month_num;
         }
     } else {
         // For overview, get from master_graph data
@@ -161,26 +174,224 @@ function updateDataPeriod(apiData, siteKey) {
             const lastData = apiData.master_graph[apiData.master_graph.length - 1];
             latestMonth = lastData.month_name;
             latestYear = lastData.year;
+            latestMonthNum = lastData.month_num;
         }
+    }
+
+    // Store latest available date
+    if (latestYear && latestMonthNum) {
+        latestAvailableYear = latestYear;
+        latestAvailableMonth = latestMonthNum;
+        selectedYear = latestYear;
+        selectedMonth = latestMonthNum;
     }
 
     // Update the header with the latest period
     const dataPeriodElement = document.getElementById('dataPeriod');
     if (dataPeriodElement && latestMonth && latestYear) {
-        dataPeriodElement.innerText = `Latest: ${latestMonth} ${latestYear}`;
+        // Always render with arrows (hidden by default)
+        const currentMonthName = monthNames[selectedMonth - 1];
+        const selectorHTML = `
+            <span class="latest-label">Latest:</span>
+            <div class="date-value-container">
+                <div class="month-control">
+                    <button class="date-arrow up-arrow" onclick="changeMonth(-1); event.stopPropagation();">▲</button>
+                    <span class="date-value">${currentMonthName}</span>
+                    <button class="date-arrow down-arrow" onclick="changeMonth(1); event.stopPropagation();">▼</button>
+                </div>
+                <div class="year-control">
+                    <button class="date-arrow up-arrow" onclick="changeYear(-1); event.stopPropagation();">▲</button>
+                    <span class="date-value">${selectedYear}</span>
+                    <button class="date-arrow down-arrow" onclick="changeYear(1); event.stopPropagation();">▼</button>
+                </div>
+            </div>
+        `;
+        dataPeriodElement.innerHTML = selectorHTML;
+        
+        // Make it interactive for overview
+        if (!siteKey) {
+            dataPeriodElement.style.cursor = 'pointer';
+            dataPeriodElement.addEventListener('mouseenter', showArrows);
+            dataPeriodElement.addEventListener('mouseleave', hideArrows);
+        }
+    }
+}
+
+// Show arrows on hover
+function showArrows() {
+    const arrows = document.querySelectorAll('#dataPeriod .date-arrow');
+    arrows.forEach(arrow => {
+        arrow.style.opacity = '1';
+        arrow.style.pointerEvents = 'auto';
+    });
+}
+
+// Hide arrows on mouse leave
+function hideArrows() {
+    const arrows = document.querySelectorAll('#dataPeriod .date-arrow');
+    arrows.forEach(arrow => {
+        arrow.style.opacity = '0';
+        arrow.style.pointerEvents = 'none';
+    });
+}
+
+// Change year (no looping, just increment/decrement)
+function changeYear(direction) {
+    const newYear = selectedYear + direction;
+    const newMonth = selectedMonth;
+    
+    // Check if the new date would exceed the latest available date
+    if (direction > 0) { // Going forward
+        if (newYear > latestAvailableYear) return; // Can't go beyond latest year
+        if (newYear === latestAvailableYear && newMonth > latestAvailableMonth) return; // Can't go beyond latest month in latest year
+    }
+    
+    // Check if going back before 2021
+    if (newYear < 2021) return;
+    
+    selectedYear = newYear;
+    updateDateSelectorDisplay();
+    fetchDataForSelectedDate();
+}
+
+// Change month (with looping)
+function changeMonth(direction) {
+    let newMonth = selectedMonth + direction;
+    let newYear = selectedYear;
+    
+    // Handle month wrapping
+    if (newMonth > 12) {
+        newMonth = 1;
+        newYear += 1;
+    } else if (newMonth < 1) {
+        newMonth = 12;
+        newYear -= 1;
+    }
+    
+    // Check if the new date would exceed the latest available date
+    if (newYear > latestAvailableYear) return; // Can't go beyond latest year
+    if (newYear === latestAvailableYear && newMonth > latestAvailableMonth) return; // Can't go beyond latest month
+    
+    // Check if going back before 2021
+    if (newYear < 2021) return;
+    
+    selectedMonth = newMonth;
+    selectedYear = newYear;
+    updateDateSelectorDisplay();
+    fetchDataForSelectedDate();
+}
+
+// Update date selector display
+function updateDateSelectorDisplay() {
+    const currentMonthName = monthNames[selectedMonth - 1];
+    const dataPeriodElement = document.getElementById('dataPeriod');
+    
+    const selectorHTML = `
+        <span class="latest-label">Latest:</span>
+        <div class="date-value-container">
+            <div class="month-control">
+                <button class="date-arrow up-arrow" onclick="changeMonth(-1); event.stopPropagation();">▲</button>
+                <span class="date-value">${currentMonthName}</span>
+                <button class="date-arrow down-arrow" onclick="changeMonth(1); event.stopPropagation();">▼</button>
+            </div>
+            <div class="year-control">
+                <button class="date-arrow up-arrow" onclick="changeYear(-1); event.stopPropagation();">▲</button>
+                <span class="date-value">${selectedYear}</span>
+                <button class="date-arrow down-arrow" onclick="changeYear(1); event.stopPropagation();">▼</button>
+            </div>
+        </div>
+    `;
+    
+    dataPeriodElement.innerHTML = selectorHTML;
+}
+
+// Fetch data for selected date
+async function fetchDataForSelectedDate() {
+    try {
+        const response = await fetch(`/api/data?year=${selectedYear}&month=${selectedMonth}`);
+        const result = await response.json();
+        
+        if (result.status === "success") {
+            const apiData = result.data;
+            
+            // Update KPI cards
+            updateKPICards(apiData.kpis, 'overview');
+            
+            // Update demographics chart (chart 2)
+            if (chart2Instance) chart2Instance.destroy();
+            const ctx2 = document.getElementById('chart2');
+            chart2Instance = new Chart(ctx2, {
+                type: 'doughnut',
+                data: {
+                    labels: apiData.demographics.map(d => d.label),
+                    datasets: [{
+                        data: apiData.demographics.map(d => d.value),
+                        backgroundColor: ['#366d75', '#68d3d8', '#4a6fa5', '#f4d35e', '#ee964b'],
+                        borderWidth: 2,
+                        hoverOffset: 10
+                    }]
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    layout: {
+                        padding: { left: 110, right: 100 , top: 0, bottom: 0 }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'right',
+                            align: 'center',
+                            labels: {
+                                boxWidth: 12,
+                                padding: 12,
+                                font: { size: 12 }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Update master graph (chart 3) with data from JAN 2021 to selected date
+            updateMasterGraphWithDateFilter(apiData.master_graph);
+        }
+    } catch (error) {
+        console.error("Error fetching data for selected date:", error);
+    }
+}
+
+// Update master graph with date filtering
+function updateMasterGraphWithDateFilter(masterGraphData) {
+    // Filter data from JAN 2021 to selected year/month
+    const filteredData = masterGraphData.filter(item => {
+        if (item.year < 2021) return false;
+        if (item.year > selectedYear) return false;
+        if (item.year === selectedYear && item.month_num > selectedMonth) return false;
+        return true;
+    });
+    
+    // Re-render chart 3 with filtered data
+    // Find the renderChart3 function in the renderOverviewCharts scope
+    // We need to update the year range filters first
+    const yearFromSelect = document.getElementById('yearFrom');
+    const yearToSelect = document.getElementById('yearTo');
+    
+    if (yearFromSelect && yearToSelect) {
+        yearFromSelect.value = 2021;
+        yearToSelect.value = selectedYear;
+    }
+    
+    // Call the renderChart3 with filtered data by reloading the entire overview
+    const ctx3 = document.getElementById('chart3');
+    if (ctx3) {
+        // Store filtered data for chart3 update
+        window.masterGraphDataForChart3 = filteredData;
     }
 }
 
 // ==========================================
 // PART 3: CHART RENDERING
 // ==========================================
-
-// Global variables for chart3 interactions
-let chart3ActiveDataIndex = null;
-let chart3IsLongClickActive = false;
-let chart3LongClickTimer;
-let chart3AllData = [];
-let chart3Canvas = null;
 
 function renderOverviewCharts(apiData) {
     // Cleanup old instances to prevent "ghost" charts
