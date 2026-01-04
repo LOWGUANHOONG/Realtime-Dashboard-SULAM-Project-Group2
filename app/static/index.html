@@ -63,12 +63,15 @@
     </div>
 
     <div class="chart-box" style="position: relative; height: 250px; display: flex; flex-direction: column;">
-        <div id="filter-container" style="width: 100%; text-align: right; padding-bottom: 5px; padding-right: 10px;">
-            <label for="demographicFilter" style="font-weight: bold; font-size: 12px; margin-right: 5px;">Filter By:</label>
-            <select id="demographicFilter" style="padding: 4px; border-radius: 4px; font-size: 12px; cursor: pointer;">
-                <option value="age">Age Group</option>
-                <option value="gender">Gender</option>
-            </select>
+        <div id="filter-container" style="width: 100%; position: relative; text-align: center; padding-top: 10px; padding-bottom: 5px; padding-right: 10px;">
+            <span style="font-weight: bold; font-size: 12px; color: #666; font-family: 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif;">DEMOGRAPHICS</span>
+            <div style="position: absolute; right: 10px; top: 10px;">
+                <label for="demographicFilter" style="font-weight: bold; font-size: 12px; margin-right: 5px;">Filter By:</label>
+                <select id="demographicFilter" style="padding: 4px; border-radius: 4px; font-size: 12px; cursor: pointer;">
+                    <option value="age">Age Group</option>
+                    <option value="gender">Gender</option>
+                </select>
+            </div>
         </div>
 
         <div style="position: relative; flex-grow: 1; width: 100%; overflow: hidden; margin-top: 0px; margin-bottom: 20px; padding-top: 10px;">

@@ -40,13 +40,26 @@ html, body {
     margin-bottom: 10px;
 }
 
-.chart-box {
+/* .chart-box {
     background: white;
     border: 1px solid #ccc;
     flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
+} */
+
+.chart-box {
+    background-color: white;
+    padding: 5px 15px; /* Reduced top padding to 5px, kept sides at 15px */
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    height: 400px; 
+    width: 100%;
+    position: relative;
+    /* Add this to help align content to the top */
+    display: flex;
+    flex-direction: column;
 }
 
 /* SIDEBAR STYLING */

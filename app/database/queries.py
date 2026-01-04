@@ -93,13 +93,11 @@ def get_demographics_chart(filter_type):
     return [dict(row) for row in rows]
 
 def get_master_contribution_index():
-    """Chart 3: Master Graph Contribution Index"""
-    # Formula: (Donations * 0.4) + (Sponsorships * 0.4) + (Volunteers * 0.2)
-    # Note: To keep it between 0-1, we assume a normalization factor (max values) 
-    # based on your 5-year mock data limits.
+    """Chart 3: Five separate lines for each cultural site"""
     conn = get_db_connection()
+    # We ensure we select the site_id so the JS can filter it
     query = """
-        SELECT year, month_name, site_id,
+        SELECT year, month_num, month_name, site_id,
         ( (donations * 0.00004) + (sponsorships * 0.00004) + (volunteers * 0.002) ) as contribution_index
         FROM site_monthly_metrics
         ORDER BY year ASC, month_num ASC

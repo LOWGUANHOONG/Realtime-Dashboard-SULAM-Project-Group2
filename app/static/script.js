@@ -138,32 +138,70 @@ function renderOverviewCharts(apiData) {
             labels: apiData.demographics.map(d => d.label),
             datasets: [{
                 data: apiData.demographics.map(d => d.value),
-                backgroundColor: ['#366d75', '#68d3d8', '#4a6fa5', '#f4d35e', '#ee964b']
+                backgroundColor: ['#366d75', '#68d3d8', '#4a6fa5', '#f4d35e', '#ee964b'],
+                borderWidth: 2,
+                hoverOffset: 10
             }]
         },
-        options: { responsive: true, maintainAspectRatio: false }
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false,
+            layout: {
+                padding: { left: 110, right: 100 , top: 0, bottom: 0 }
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'right', // Moves legend to the right
+                    align: 'center',   // Centers legend vertically
+                    labels: {
+                        boxWidth: 12,
+                        padding: 12,
+                        font: { size: 12 }
+                    }
+                }
+            }
+        }
     });
 
-    // --- CHART 3: MASTER CONTRIBUTION INDEX ---
+    // --- CHART 3: MULTI-LINE MASTER GRAPH ---
     const ctx3 = document.getElementById('chart3');
+    
+    // 1. Create a unique list of Year-Month labels (using only one site's data to avoid duplicates)
+    const labels = apiData.master_graph
+        .filter(item => item.site_id === 1)
+        .map(item => `${item.month_name} ${item.year}`);
+
+    // 2. Helper function to extract data for a specific site
+    const getSiteData = (id) => apiData.master_graph
+        .filter(item => item.site_id === id)
+        .map(item => item.contribution_index);
+
     chart3Instance = new Chart(ctx3, {
         type: 'line',
         data: {
-            labels: apiData.master_graph.map(m => `${m.month_name} ${m.year}`),
-            datasets: [{
-                label: 'Contribution Index',
-                data: apiData.master_graph.map(m => m.contribution_index),
-                borderColor: '#366d75',
-                fill: false,
-                tension: 0.3
-            }]
+            labels: labels,
+            datasets: [
+                { label: 'Heritage Centre', data: getSiteData(1), borderColor: '#366d75', tension: 0.3, fill: false },
+                { label: 'Stadium Merdeka', data: getSiteData(2), borderColor: '#68d3d8', tension: 0.3, fill: false },
+                { label: 'Suffolk House',   data: getSiteData(3), borderColor: '#4a6fa5', tension: 0.3, fill: false },
+                { label: 'No. 8 Heeren Street', data: getSiteData(4), borderColor: '#f4d35e', tension: 0.3, fill: false },
+                { label: 'Rumah Penghulu Abu Seman', data: getSiteData(5), borderColor: '#ee964b', tension: 0.3, fill: false }
+            ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { title: { display: true, text: 'MASTER CONTRIBUTION INDEX' } }
+            plugins: {
+                title: { display: true, text: 'CONTRIBUTION INDEX BY CULTURAL SITE' },
+                legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } }
+            },
+            scales: {
+                y: { beginAtZero: true, title: { display: true, text: 'Index Score' } }
+            }
         }
     });
+
 }
 
 function renderSiteCharts(apiData, siteKey) {
