@@ -14,6 +14,12 @@ const siteIdMap = {
 };
 
 document.addEventListener("DOMContentLoaded", function () {
+    // Ensure the BWM box is active on initial load
+    const bwmBox = document.querySelector('.new-site');
+    if (bwmBox) {
+        bwmBox.classList.add('active');
+    }
+    
     // Initial load: BWM Overview
     fetchAndRender();
 
