@@ -17,6 +17,10 @@
     <div class="header-center">
         <h1>Real-time Community Contribution Dashboard</h1>
     </div>
+
+    <div class="header-right">
+        <div class="data-period" id="dataPeriod"></div>
+    </div>
 </header>
 
 <div class="dashboard-wrapper">
@@ -64,7 +68,7 @@
 
     <div class="chart-box" style="position: relative; height: 250px; display: flex; flex-direction: column;">
         <div id="filter-container" style="width: 100%; position: relative; text-align: center; padding-top: 12px; padding-bottom: 10px; padding-right: 10px;">
-            <span style="font-weight: 600; font-size: 13px; color: #004d4d; font-family: 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif; letter-spacing: 0.5px;">DEMOGRAPHICS</span>
+            <span style="font-weight: 600; font-size: 13px; color: #004d4d; font-family: 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif; letter-spacing: 0.5px;">DEMOGRAPHICS (AGE / GENDER)</span>
             <div style="position: absolute; right: 10px; top: 12px; display: flex; align-items: center; gap: 8px;">
                 <!-- <label for="demographicFilter" style="font-weight: 600; font-size: 11px; color: #333; margin-right: 0; letter-spacing: 0.3px;">FILTER:</label> -->
                 <select id="demographicFilter" style="padding: 6px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; border: 1.5px solid #006666; background-color: white; color: #004d4d; font-weight: 500; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,102,102,0.1);">
@@ -83,6 +87,15 @@
     <div class="bottom-container" style="position: relative;">  
     
     <div class="chart-box full-width" style="position: relative; height: 300px;">
+        <div style="position: absolute; top: 8px; right: 15px; z-index: 10; display: flex; align-items: center; gap: 6px; padding: 6px 10px; background-color: rgba(255, 255, 255, 0.95); border-radius: 6px;">
+            <label for="yearFrom" style="font-weight: 600; font-size: 11px; color: #004d4d; margin: 0;">From:</label>
+            <select id="yearFrom" style="padding: 4px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; border: 1px solid #006666; background-color: white; color: #004d4d; font-weight: 500; transition: all 0.2s ease;">
+            </select>
+            
+            <label for="yearTo" style="font-weight: 600; font-size: 11px; color: #004d4d; margin: 0 0 0 4px;">To:</label>
+            <select id="yearTo" style="padding: 4px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; border: 1px solid #006666; background-color: white; color: #004d4d; font-weight: 500; transition: all 0.2s ease;">
+            </select>
+        </div>
         <canvas id="chart3"></canvas>
     </div>
 

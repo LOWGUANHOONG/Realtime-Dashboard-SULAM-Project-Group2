@@ -269,6 +269,21 @@ html, body {
 
 .header-right {
     right: 25px;
+    text-align: right;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.data-period {
+    font-size: 0.85rem;
+    color: #004d4d;
+    font-weight: 600;
+    padding: 8px 16px;
+    background: rgba(0, 102, 102, 0.1);
+    border-radius: 6px;
+    border-left: 3px solid #006666;
+    letter-spacing: 0.5px;
 }
 
 .logo-box img {
