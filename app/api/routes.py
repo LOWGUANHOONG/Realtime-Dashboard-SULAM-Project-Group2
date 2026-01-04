@@ -1,5 +1,4 @@
-# app/api/routes.py
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, current_app, request
 from app.database.queries import (
     get_bwm_kpi_cards, 
     get_site_kpi_cards,
@@ -9,12 +8,17 @@ from app.database.queries import (
     get_individual_site_charts
 )
 
-api_bp = Blueprint('api', __name__, url_prefix='/api')
+api_bp = Blueprint('api', __name__)
 
-@api_bp.route('/data')
+@api_bp.route('/')
+def serve_index():
+    """Serves the dashboard HTML file from the static folder."""
+    return current_app.send_static_file('index.html')
+
+@api_bp.route('/api/data')
 def get_dashboard_data():
     try:
-        # Determine if we are looking at a specific site or BWM overview
+        # request.args.get is used to capture parameters from the frontend URL
         site_id = request.args.get('site_id') 
         demographic_type = request.args.get('demo_filter', 'age')
 

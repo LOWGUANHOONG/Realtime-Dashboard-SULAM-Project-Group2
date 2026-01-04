@@ -56,16 +56,25 @@ def get_site_kpi_cards(site_id):
 # ==========================================
 
 def get_org_membership_chart():
-    """Chart 1: Annual sum of (Total Members + Council Members)"""
     conn = get_db_connection()
+    # Ensure the table name matches your actual SQLite database schema
     query = """
-        SELECT year, SUM(total_members + council_members) as combined_total 
+        SELECT 
+            year,
+            ROUND(AVG(total_members)) as avg_members,
+            ROUND(AVG(council_members)) as avg_council
         FROM org_stats 
-        GROUP BY year ORDER BY year ASC
+        GROUP BY year
+        ORDER BY year ASC
     """
-    rows = conn.execute(query).fetchall()
-    conn.close()
-    return [dict(row) for row in rows]
+    try:
+        rows = conn.execute(query).fetchall()
+        return [dict(row) for row in rows]
+    except Exception as e:
+        print(f"Error in Membership Query: {e}") # Check your terminal for this!
+        return []
+    finally:
+        conn.close()
 
 def get_demographics_chart(filter_type):
     """Chart 2: Demographics based on 'age_range' or 'gender'"""
