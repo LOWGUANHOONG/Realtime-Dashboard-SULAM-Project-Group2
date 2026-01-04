@@ -218,5 +218,9 @@ function updateDashboard(siteKey) {
 
 function showOverview() {
     document.querySelectorAll('.site-box').forEach(el => el.classList.remove('active'));
+    // Add active class to BWM box when showing overview
+    const bwmBox = document.querySelector('.new-site');
+    if (bwmBox) bwmBox.classList.add('active');
+    
     fetchAndRender();
 }
