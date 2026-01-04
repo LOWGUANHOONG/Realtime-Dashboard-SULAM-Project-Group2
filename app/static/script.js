@@ -177,28 +177,307 @@ function renderOverviewCharts(apiData) {
         .filter(item => item.site_id === id)
         .map(item => item.contribution_index);
 
+    // Custom plugin for vertical line
+    let activeDataIndex = null;
+    const verticalLinePlugin = {
+        id: 'verticalLinePlugin',
+        afterDatasetsDraw: (chart) => {
+            if (activeDataIndex !== null) {
+                const ctx = chart.ctx;
+                const xAxis = chart.scales.x;
+                const yAxis = chart.scales.y;
+                const x = xAxis.getPixelForValue(activeDataIndex);
+
+                // Draw vertical line
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(x, yAxis.top);
+                ctx.lineTo(x, yAxis.bottom);
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = 'rgba(0, 102, 102, 0.6)';
+                ctx.setLineDash([5, 5]);
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+    };
+
     chart3Instance = new Chart(ctx3, {
         type: 'line',
         data: {
             labels: labels,
             datasets: [
-                { label: 'Heritage Centre', data: getSiteData(1), borderColor: '#366d75', tension: 0.3, fill: false },
-                { label: 'Stadium Merdeka', data: getSiteData(2), borderColor: '#68d3d8', tension: 0.3, fill: false },
-                { label: 'Suffolk House',   data: getSiteData(3), borderColor: '#4a6fa5', tension: 0.3, fill: false },
-                { label: 'No. 8 Heeren Street', data: getSiteData(4), borderColor: '#f4d35e', tension: 0.3, fill: false },
-                { label: 'Rumah Penghulu Abu Seman', data: getSiteData(5), borderColor: '#ee964b', tension: 0.3, fill: false }
+                { label: 'Heritage Centre', data: getSiteData(1), borderColor: '#366d75', tension: 0.3, fill: false, pointRadius: 3, pointHoverRadius: 5 },
+                { label: 'Stadium Merdeka', data: getSiteData(2), borderColor: '#68d3d8', tension: 0.3, fill: false, pointRadius: 3, pointHoverRadius: 5 },
+                { label: 'Suffolk House',   data: getSiteData(3), borderColor: '#4a6fa5', tension: 0.3, fill: false, pointRadius: 3, pointHoverRadius: 5 },
+                { label: 'No. 8 Heeren Street', data: getSiteData(4), borderColor: '#f4d35e', tension: 0.3, fill: false, pointRadius: 3, pointHoverRadius: 5 },
+                { label: 'Rumah Penghulu Abu Seman', data: getSiteData(5), borderColor: '#ee964b', tension: 0.3, fill: false, pointRadius: 3, pointHoverRadius: 5 }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: {
+                mode: 'point',
+                intersect: true
+            },
             plugins: {
                 title: { display: true, text: 'CONTRIBUTION INDEX BY CULTURAL SITE' },
-                legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } }
+                legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
+                tooltip: {
+                    enabled: true,
+                    mode: 'point',
+                    intersect: true,
+                    backgroundColor: 'rgba(0, 51, 77, 0.9)',
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    borderColor: '#006666',
+                    borderWidth: 2,
+                    padding: 12,
+                    displayColors: true,
+                    callbacks: {
+                        title: (tooltipItems) => {
+                            return tooltipItems.length > 0 ? tooltipItems[0].label : '';
+                        },
+                        label: (context) => {
+                            const value = context.parsed.y;
+                            if (value !== null && value !== undefined) {
+                                return `${context.dataset.label}: ${value.toFixed(2)}`;
+                            }
+                            return `${context.dataset.label}: N/A`;
+                        }
+                    }
+                }
             },
             scales: {
                 y: { beginAtZero: true, title: { display: true, text: 'Index Score' } }
             }
+        },
+        plugins: [verticalLinePlugin]
+    });
+
+    // --- LONG CLICK LOGIC ---
+    let longClickTimer;
+    let isLongClickActive = false;
+    let previousActiveIndex = null;
+    const canvas3 = document.getElementById('chart3');
+
+    canvas3.addEventListener('mousedown', (e) => {
+        // Only trigger if left mouse button is pressed
+        if (e.button !== 0) return; 
+
+        longClickTimer = setTimeout(() => {
+            isLongClickActive = true;
+            canvas3.style.cursor = 'crosshair';
+            
+            // Switch tooltip to index mode for long click
+            chart3Instance.options.interaction.mode = 'index';
+            chart3Instance.options.interaction.intersect = false;
+            chart3Instance.options.plugins.tooltip.mode = 'index';
+            chart3Instance.options.plugins.tooltip.intersect = false;
+            
+            // Initial activation
+            const points = chart3Instance.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
+            
+            if (points.length) {
+                activeDataIndex = points[0].index;
+                previousActiveIndex = activeDataIndex;
+                
+                // Show tooltip for all datasets at this index
+                const activeElements = chart3Instance.data.datasets.map((dataset, datasetIndex) => ({
+                    datasetIndex: datasetIndex,
+                    index: activeDataIndex
+                }));
+                
+                chart3Instance.setActiveElements(activeElements);
+                chart3Instance.tooltip.setActiveElements(activeElements, { x: e.offsetX, y: e.offsetY });
+                chart3Instance.tooltip.options.enabled = true;
+                chart3Instance.update('none');
+            }
+        }, 500); // 500ms duration for long click
+    });
+
+    // Track mouse movement during long click
+    canvas3.addEventListener('mousemove', (e) => {
+        if (isLongClickActive) {
+            // Update the vertical line position as cursor moves
+            const points = chart3Instance.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
+            
+            if (points.length > 0) {
+                const newActiveIndex = points[0].index;
+                
+                // Only update tooltip if the index actually changed
+                if (newActiveIndex !== previousActiveIndex) {
+                    activeDataIndex = newActiveIndex;
+                    previousActiveIndex = newActiveIndex;
+                    
+                    // Manually create active elements for ALL datasets at this index
+                    const activeElements = chart3Instance.data.datasets.map((dataset, datasetIndex) => ({
+                        datasetIndex: datasetIndex,
+                        index: activeDataIndex
+                    }));
+                    
+                    chart3Instance.setActiveElements(activeElements);
+                    chart3Instance.tooltip.setActiveElements(activeElements, { x: e.offsetX, y: e.offsetY });
+                    chart3Instance.update('none');
+                } else {
+                    // Same index, just update tooltip position
+                    chart3Instance.tooltip.setActiveElements(
+                        chart3Instance.tooltip.getActiveElements(),
+                        { x: e.offsetX, y: e.offsetY }
+                    );
+                }
+            }
+        }
+    });
+
+    canvas3.addEventListener('mouseup', () => {
+        clearTimeout(longClickTimer);
+        
+        // Only clear if it was a long click
+        if (isLongClickActive) {
+            activeDataIndex = null;
+            previousActiveIndex = null;
+            isLongClickActive = false;
+            canvas3.style.cursor = 'default';
+            
+            // Switch tooltip back to point mode for normal hover
+            chart3Instance.options.interaction.mode = 'point';
+            chart3Instance.options.interaction.intersect = true;
+            chart3Instance.options.plugins.tooltip.mode = 'point';
+            chart3Instance.options.plugins.tooltip.intersect = true;
+            
+            chart3Instance.setActiveElements([]);
+            chart3Instance.tooltip.setActiveElements([], { x: 0, y: 0 });
+            chart3Instance.update();
+        }
+    });
+
+    // If the user moves the mouse out while holding, cancel everything
+    canvas3.addEventListener('mouseleave', () => {
+        clearTimeout(longClickTimer);
+        if (isLongClickActive) {
+            activeDataIndex = null;
+            previousActiveIndex = null;
+            isLongClickActive = false;
+            canvas3.style.cursor = 'default';
+            
+            // Switch tooltip back to point mode for normal hover
+            chart3Instance.options.interaction.mode = 'point';
+            chart3Instance.options.interaction.intersect = true;
+            chart3Instance.options.plugins.tooltip.mode = 'point';
+            chart3Instance.options.plugins.tooltip.intersect = true;
+            
+            chart3Instance.setActiveElements([]);
+            chart3Instance.tooltip.setActiveElements([], { x: 0, y: 0 });
+            chart3Instance.update();
+        }
+    });
+
+    // Touch support for mobile devices
+    canvas3.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        
+        longClickTimer = setTimeout(() => {
+            isLongClickActive = true;
+            
+            // Switch tooltip to index mode for long click
+            chart3Instance.options.interaction.mode = 'index';
+            chart3Instance.options.interaction.intersect = false;
+            chart3Instance.options.plugins.tooltip.mode = 'index';
+            chart3Instance.options.plugins.tooltip.intersect = false;
+            
+            const rect = canvas3.getBoundingClientRect();
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            
+            const points = chart3Instance.getElementsAtEventForMode(
+                { x, y, native: e },
+                'index',
+                { intersect: false },
+                true
+            );
+            
+            if (points.length) {
+                activeDataIndex = points[0].index;
+                previousActiveIndex = activeDataIndex;
+                
+                const activeElements = chart3Instance.data.datasets.map((dataset, datasetIndex) => ({
+                    datasetIndex: datasetIndex,
+                    index: activeDataIndex
+                }));
+                
+                chart3Instance.setActiveElements(activeElements);
+                chart3Instance.tooltip.setActiveElements(activeElements, { x, y });
+                chart3Instance.tooltip.options.enabled = true;
+                chart3Instance.update('none');
+            }
+        }, 500);
+    });
+
+    // Track touch movement during long press
+    canvas3.addEventListener('touchmove', (e) => {
+        if (isLongClickActive) {
+            e.preventDefault();
+            const rect = canvas3.getBoundingClientRect();
+            const touch = e.touches[0];
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            
+            const points = chart3Instance.getElementsAtEventForMode(
+                { x, y, native: e },
+                'index',
+                { intersect: false },
+                true
+            );
+            
+            if (points.length) {
+                const newActiveIndex = points[0].index;
+                
+                // Only update if the index changed
+                if (newActiveIndex !== previousActiveIndex) {
+                    activeDataIndex = newActiveIndex;
+                    previousActiveIndex = newActiveIndex;
+                    
+                    // Manually create active elements for ALL datasets at this index
+                    const activeElements = chart3Instance.data.datasets.map((dataset, datasetIndex) => ({
+                        datasetIndex: datasetIndex,
+                        index: activeDataIndex
+                    }));
+                    
+                    chart3Instance.setActiveElements(activeElements);
+                    chart3Instance.tooltip.setActiveElements(activeElements, { x, y });
+                    chart3Instance.update('none');
+                } else {
+                    // Same index, just update tooltip position
+                    chart3Instance.tooltip.setActiveElements(
+                        chart3Instance.tooltip.getActiveElements(),
+                        { x, y }
+                    );
+                }
+            }
+        } else {
+            clearTimeout(longClickTimer);
+        }
+    });
+
+    canvas3.addEventListener('touchend', () => {
+        clearTimeout(longClickTimer);
+        if (isLongClickActive) {
+            activeDataIndex = null;
+            previousActiveIndex = null;
+            isLongClickActive = false;
+            
+            // Switch tooltip back to point mode for normal hover
+            chart3Instance.options.interaction.mode = 'point';
+            chart3Instance.options.interaction.intersect = true;
+            chart3Instance.options.plugins.tooltip.mode = 'point';
+            chart3Instance.options.plugins.tooltip.intersect = true;
+            
+            chart3Instance.setActiveElements([]);
+            chart3Instance.tooltip.setActiveElements([], { x: 0, y: 0 });
+            chart3Instance.update();
         }
     });
 
