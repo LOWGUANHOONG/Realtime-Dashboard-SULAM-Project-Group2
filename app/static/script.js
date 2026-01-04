@@ -78,13 +78,13 @@ function updateKPICards(kpis, view) {
         document.getElementById('filter-container').style.display = 'block';
     } else {
         document.getElementById('info-box-1-title').innerText = "LATEST DONATIONS";
-        document.getElementById('info-box-1-value').innerText = kpis.donations + "k";
+        document.getElementById('info-box-1-value').innerText = kpis.donations;
 
         document.getElementById('info-box-2-title').innerText = "ACTIVE VOLUNTEERS";
         document.getElementById('info-box-2-value').innerText = kpis.volunteers;
 
         document.getElementById('info-box-3-title').innerText = "LATEST SPONSORSHIPS";
-        document.getElementById('info-box-3-value').innerText = kpis.sponsorships + "k";
+        document.getElementById('info-box-3-value').innerText = kpis.sponsorships;
 
         document.getElementById('filter-container').style.display = 'none';
     }
