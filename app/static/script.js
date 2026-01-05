@@ -417,36 +417,379 @@ async function fetchDataForSelectedDate() {
 
 // Update master graph with date filtering
 function updateMasterGraphWithDateFilter(masterGraphData) {
-    // Filter data from JAN 2021 to selected year/month
-    const filteredData = masterGraphData.filter(item => {
-        if (item.year < 2021) return false;
-        if (item.year > selectedYear) return false;
-        if (item.year === selectedYear && item.month_num > selectedMonth) return false;
-        return true;
-    });
+    // Backend already filters data to selectedYear/selectedMonth
+    // Just re-render chart3 with the filtered data
     
-    // Re-render chart 3 with filtered data
-    // Find the renderChart3 function in the renderOverviewCharts scope
-    // We need to update the year range filters first
-    const yearFromSelect = document.getElementById('yearFrom');
-    const yearToSelect = document.getElementById('yearTo');
-    
-    if (yearFromSelect && yearToSelect) {
-        yearFromSelect.value = 2021;
-        yearToSelect.value = selectedYear;
-    }
-    
-    // Call the renderChart3 with filtered data by reloading the entire overview
-    const ctx3 = document.getElementById('chart3');
-    if (ctx3) {
-        // Store filtered data for chart3 update
-        window.masterGraphDataForChart3 = filteredData;
-    }
+    if (chart3Instance) chart3Instance.destroy();
+    renderChart3Helper(masterGraphData);
 }
 
 // ==========================================
 // PART 3: CHART RENDERING
 // ==========================================
+
+// Helper function to render Chart 3 (can be called from anywhere)
+function renderChart3Helper(masterGraphData) {
+    const ctx3 = document.getElementById('chart3');
+    if (!ctx3) return;
+    
+    if (chart3Instance) chart3Instance.destroy();
+    
+    // Create labels and data from filtered masterGraphData
+    const allData = masterGraphData.filter(item => item.site_id === 1);
+    const labels = [];
+    
+    allData.forEach((item) => {
+        labels.push(item.month_num === 1 ? item.year : '');
+    });
+
+    // Helper function to extract data for a specific site (all monthly data)
+    const getSiteData = (id) => masterGraphData
+        .filter(item => item.site_id === id)
+        .map(item => item.contribution_index);
+
+    // Custom plugin for vertical lines (bold for January, subtle for other months)
+    const verticalLinePlugin = {
+        id: 'verticalLinePlugin',
+        afterDatasetsDraw: (chart) => {
+            const ctx = chart.ctx;
+            const xAxis = chart.scales.x;
+            const yAxis = chart.scales.y;
+            
+            // Draw grid lines for all data points
+            allData.forEach((item, index) => {
+                const x = xAxis.getPixelForValue(index);
+                
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(x, yAxis.top);
+                ctx.lineTo(x, yAxis.bottom);
+                
+                // Bold line for January (month_num === 1), subtle for other months
+                if (item.month_num === 1) {
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeStyle = 'rgba(120, 120, 120, 0.7)';
+                } else {
+                    ctx.lineWidth = 0.8;
+                    ctx.strokeStyle = 'rgba(150, 150, 150, 0.2)';
+                }
+                ctx.setLineDash([]);
+                ctx.stroke();
+                ctx.restore();
+            });
+            
+            // Draw the interactive vertical line when user long-clicks (use global variable)
+            if (chart3IsLongClickActive && chart3ActiveDataIndex !== null && chart3ActiveDataIndex !== -1) {
+                const x = xAxis.getPixelForValue(chart3ActiveDataIndex);
+                
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(x, yAxis.top);
+                ctx.lineTo(x, yAxis.bottom);
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = 'rgba(0, 102, 102, 0.6)';
+                ctx.setLineDash([5, 5]);
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+    };
+
+    chart3Instance = new Chart(ctx3, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                { label: 'Heritage Centre', data: getSiteData(1), borderColor: '#366d75', tension: 0.3, fill: false, pointRadius: 3, pointHoverRadius: 5 },
+                { label: 'Stadium Merdeka', data: getSiteData(2), borderColor: '#68d3d8', tension: 0.3, fill: false, pointRadius: 3, pointHoverRadius: 5 },
+                { label: 'Suffolk House',   data: getSiteData(3), borderColor: '#4a6fa5', tension: 0.3, fill: false, pointRadius: 3, pointHoverRadius: 5 },
+                { label: 'No. 8 Heeren Street', data: getSiteData(4), borderColor: '#f4d35e', tension: 0.3, fill: false, pointRadius: 3, pointHoverRadius: 5 },
+                { label: 'Rumah Penghulu Abu Seman', data: getSiteData(5), borderColor: '#ee964b', tension: 0.3, fill: false, pointRadius: 3, pointHoverRadius: 5 }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'point',
+                intersect: true
+            },
+            plugins: {
+                title: { display: true, text: 'CONTRIBUTION INDEX BY MONTH AND YEAR' },
+                legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
+                tooltip: {
+                    enabled: true,
+                    mode: 'point',
+                    intersect: true,
+                    backgroundColor: 'rgba(0, 51, 77, 0.9)',
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    borderColor: '#006666',
+                    borderWidth: 2,
+                    padding: 12,
+                    displayColors: true,
+                    callbacks: {
+                        title: (tooltipItems) => {
+                            if (tooltipItems.length > 0) {
+                                const dataIndex = tooltipItems[0].dataIndex;
+                                if (allData[dataIndex]) {
+                                    return `${allData[dataIndex].month_name} ${allData[dataIndex].year}`;
+                                }
+                            }
+                            return '';
+                        },
+                        label: (context) => {
+                            const value = context.parsed.y;
+                            if (value !== null && value !== undefined) {
+                                return `${context.dataset.label}: ${value.toFixed(2)}`;
+                            }
+                            return `${context.dataset.label}: N/A`;
+                        },
+                        // Add footer to show instruction in normal mode
+                        footer: (tooltipItems) => {
+                            if (!chart3IsLongClickActive && tooltipItems.length > 0) {
+                                return 'Long-press to see all sites';
+                            }
+                            return '';
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        drawOnChartArea: false,
+                        drawBorder: false
+                    }
+                },
+                y: { 
+                    beginAtZero: true, 
+                    title: { display: true, text: 'Contribution Index (0.00 - 1.00)' },
+                    grid: {
+                        color: 'rgba(200, 200, 200, 0.5)',
+                        drawBorder: false
+                    }
+                }
+            }
+        },
+        plugins: [verticalLinePlugin]
+    });
+    
+    // Store for use in event handlers
+    chart3AllData = allData;
+    
+    // Setup long-click event listeners for the canvas
+    setupChart3LongClickListeners();
+}
+
+// Setup long-click event listeners for Chart 3
+function setupChart3LongClickListeners() {
+    const canvas = document.getElementById('chart3');
+    if (!canvas) return;
+    
+    let previousActiveIndex = null;
+    
+    canvas.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        
+        chart3LongClickTimer = setTimeout(() => {
+            chart3IsLongClickActive = true;
+            canvas.style.cursor = 'crosshair';
+            
+            // Switch tooltip to index mode
+            chart3Instance.options.interaction.mode = 'index';
+            chart3Instance.options.interaction.intersect = false;
+            chart3Instance.options.plugins.tooltip.mode = 'index';
+            chart3Instance.options.plugins.tooltip.intersect = false;
+            
+            const points = chart3Instance.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
+            
+            if (points.length) {
+                chart3ActiveDataIndex = points[0].index;
+                previousActiveIndex = chart3ActiveDataIndex;
+                
+                const activeElements = chart3Instance.data.datasets.map((dataset, datasetIndex) => ({
+                    datasetIndex: datasetIndex,
+                    index: chart3ActiveDataIndex
+                }));
+                
+                chart3Instance.setActiveElements(activeElements);
+                chart3Instance.tooltip.setActiveElements(activeElements, { x: e.offsetX, y: e.offsetY });
+                chart3Instance.tooltip.options.enabled = true;
+                chart3Instance.update('none');
+            }
+        }, 500);
+    });
+    
+    canvas.addEventListener('mousemove', (e) => {
+        if (chart3IsLongClickActive) {
+            const points = chart3Instance.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
+            
+            if (points.length > 0) {
+                const newActiveIndex = points[0].index;
+                
+                if (newActiveIndex !== previousActiveIndex) {
+                    chart3ActiveDataIndex = newActiveIndex;
+                    previousActiveIndex = newActiveIndex;
+                    
+                    const activeElements = chart3Instance.data.datasets.map((dataset, datasetIndex) => ({
+                        datasetIndex: datasetIndex,
+                        index: chart3ActiveDataIndex
+                    }));
+                    
+                    chart3Instance.setActiveElements(activeElements);
+                    chart3Instance.tooltip.setActiveElements(activeElements, { x: e.offsetX, y: e.offsetY });
+                    chart3Instance.update('none');
+                } else {
+                    chart3Instance.tooltip.setActiveElements(
+                        chart3Instance.tooltip.getActiveElements(),
+                        { x: e.offsetX, y: e.offsetY }
+                    );
+                }
+            }
+        }
+    });
+    
+    canvas.addEventListener('mouseup', () => {
+        clearTimeout(chart3LongClickTimer);
+        
+        if (chart3IsLongClickActive) {
+            chart3ActiveDataIndex = null;
+            previousActiveIndex = null;
+            chart3IsLongClickActive = false;
+            canvas.style.cursor = 'default';
+            
+            chart3Instance.options.interaction.mode = 'point';
+            chart3Instance.options.interaction.intersect = true;
+            chart3Instance.options.plugins.tooltip.mode = 'point';
+            chart3Instance.options.plugins.tooltip.intersect = true;
+            
+            chart3Instance.setActiveElements([]);
+            chart3Instance.tooltip.setActiveElements([], { x: 0, y: 0 });
+            chart3Instance.update();
+        }
+    });
+    
+    canvas.addEventListener('mouseleave', () => {
+        clearTimeout(chart3LongClickTimer);
+        if (chart3IsLongClickActive) {
+            chart3ActiveDataIndex = null;
+            previousActiveIndex = null;
+            chart3IsLongClickActive = false;
+            canvas.style.cursor = 'default';
+            
+            chart3Instance.options.interaction.mode = 'point';
+            chart3Instance.options.interaction.intersect = true;
+            chart3Instance.options.plugins.tooltip.mode = 'point';
+            chart3Instance.options.plugins.tooltip.intersect = true;
+            
+            chart3Instance.setActiveElements([]);
+            chart3Instance.tooltip.setActiveElements([], { x: 0, y: 0 });
+            chart3Instance.update();
+        }
+    });
+    
+    // Touch support
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        
+        chart3LongClickTimer = setTimeout(() => {
+            chart3IsLongClickActive = true;
+            
+            chart3Instance.options.interaction.mode = 'index';
+            chart3Instance.options.interaction.intersect = false;
+            chart3Instance.options.plugins.tooltip.mode = 'index';
+            chart3Instance.options.plugins.tooltip.intersect = false;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            
+            const points = chart3Instance.getElementsAtEventForMode(
+                { x, y, native: e },
+                'index',
+                { intersect: false },
+                true
+            );
+            
+            if (points.length) {
+                chart3ActiveDataIndex = points[0].index;
+                previousActiveIndex = chart3ActiveDataIndex;
+                
+                const activeElements = chart3Instance.data.datasets.map((dataset, datasetIndex) => ({
+                    datasetIndex: datasetIndex,
+                    index: chart3ActiveDataIndex
+                }));
+                
+                chart3Instance.setActiveElements(activeElements);
+                chart3Instance.tooltip.setActiveElements(activeElements, { x, y });
+                chart3Instance.tooltip.options.enabled = true;
+                chart3Instance.update('none');
+            }
+        }, 500);
+    });
+    
+    canvas.addEventListener('touchmove', (e) => {
+        if (chart3IsLongClickActive) {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            
+            const points = chart3Instance.getElementsAtEventForMode(
+                { x, y, native: e },
+                'index',
+                { intersect: false },
+                true
+            );
+            
+            if (points.length) {
+                const newActiveIndex = points[0].index;
+                
+                if (newActiveIndex !== previousActiveIndex) {
+                    chart3ActiveDataIndex = newActiveIndex;
+                    previousActiveIndex = newActiveIndex;
+                    
+                    const activeElements = chart3Instance.data.datasets.map((dataset, datasetIndex) => ({
+                        datasetIndex: datasetIndex,
+                        index: chart3ActiveDataIndex
+                    }));
+                    
+                    chart3Instance.setActiveElements(activeElements);
+                    chart3Instance.tooltip.setActiveElements(activeElements, { x, y });
+                    chart3Instance.update('none');
+                } else {
+                    chart3Instance.tooltip.setActiveElements(
+                        chart3Instance.tooltip.getActiveElements(),
+                        { x, y }
+                    );
+                }
+            }
+        } else {
+            clearTimeout(chart3LongClickTimer);
+        }
+    });
+    
+    canvas.addEventListener('touchend', () => {
+        clearTimeout(chart3LongClickTimer);
+        if (chart3IsLongClickActive) {
+            chart3ActiveDataIndex = null;
+            previousActiveIndex = null;
+            chart3IsLongClickActive = false;
+            
+            chart3Instance.options.interaction.mode = 'point';
+            chart3Instance.options.interaction.intersect = true;
+            chart3Instance.options.plugins.tooltip.mode = 'point';
+            chart3Instance.options.plugins.tooltip.intersect = true;
+            
+            chart3Instance.setActiveElements([]);
+            chart3Instance.tooltip.setActiveElements([], { x: 0, y: 0 });
+            chart3Instance.update();
+        }
+    });
+}
 
 function renderOverviewCharts(apiData) {
     // Cleanup old instances to prevent "ghost" charts
@@ -524,416 +867,8 @@ function renderOverviewCharts(apiData) {
     });
 
     // --- CHART 3: MULTI-LINE MASTER GRAPH ---
-    const ctx3 = document.getElementById('chart3');
-    
-    // Store original data for filtering
-    const originalMasterGraph = apiData.master_graph;
-    
-    // Initialize year dropdowns
-    const initializeYearDropdowns = () => {
-        const allYears = [...new Set(originalMasterGraph.map(item => item.year))].sort((a, b) => a - b);
-        const yearFromSelect = document.getElementById('yearFrom');
-        const yearToSelect = document.getElementById('yearTo');
-        
-        if (yearFromSelect && yearToSelect) {
-            yearFromSelect.innerHTML = '';
-            yearToSelect.innerHTML = '';
-            
-            allYears.forEach(year => {
-                const option1 = document.createElement('option');
-                option1.value = year;
-                option1.textContent = year;
-                yearFromSelect.appendChild(option1);
-                
-                const option2 = document.createElement('option');
-                option2.value = year;
-                option2.textContent = year;
-                yearToSelect.appendChild(option2);
-            });
-            
-            // Set default values (first to last year)
-            yearFromSelect.value = allYears[0];
-            yearToSelect.value = allYears[allYears.length - 1];
-            
-            // Add event listeners
-            yearFromSelect.addEventListener('change', updateChart3WithFilter);
-            yearToSelect.addEventListener('change', updateChart3WithFilter);
-        }
-    };
-    
-    // Function to update chart based on year range
-    const updateChart3WithFilter = () => {
-        const yearFrom = parseInt(document.getElementById('yearFrom').value);
-        const yearTo = parseInt(document.getElementById('yearTo').value);
-        
-        // Filter data based on year range
-        const filteredData = originalMasterGraph.filter(item => {
-            if (item.year < yearFrom || item.year > yearTo) return false;
-            // Include only January of start year and December of end year and everything in between
-            if (item.year === yearFrom && item.month_num < 1) return false;
-            if (item.year === yearTo && item.month_num > 12) return false;
-            return true;
-        });
-        
-        // Recreate chart with filtered data
-        renderChart3(filteredData);
-    };
-    
-    // Extract to a separate function for rendering chart3
-    const renderChart3 = (masterGraphData) => {
-        if (chart3Instance) chart3Instance.destroy();
-        
-        // Create labels and data from filtered masterGraphData
-        const allData = masterGraphData.filter(item => item.site_id === 1);
-        const labels = [];
-        
-        allData.forEach((item) => {
-            labels.push(item.month_num === 1 ? item.year : '');
-        });
-
-        // Helper function to extract data for a specific site (all monthly data)
-        const getSiteData = (id) => masterGraphData
-            .filter(item => item.site_id === id)
-            .map(item => item.contribution_index);
-
-        // Custom plugin for vertical lines (bold for January, subtle for other months)
-        const verticalLinePlugin = {
-            id: 'verticalLinePlugin',
-            afterDatasetsDraw: (chart) => {
-                const ctx = chart.ctx;
-                const xAxis = chart.scales.x;
-                const yAxis = chart.scales.y;
-                
-                // Draw grid lines for all data points
-                allData.forEach((item, index) => {
-                    const x = xAxis.getPixelForValue(index);
-                    
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.moveTo(x, yAxis.top);
-                    ctx.lineTo(x, yAxis.bottom);
-                    
-                    // Bold line for January (month_num === 1), subtle for other months
-                    if (item.month_num === 1) {
-                        ctx.lineWidth = 1.5;
-                        ctx.strokeStyle = 'rgba(120, 120, 120, 0.7)';
-                    } else {
-                        ctx.lineWidth = 0.8;
-                        ctx.strokeStyle = 'rgba(150, 150, 150, 0.2)';
-                    }
-                    ctx.setLineDash([]);
-                    ctx.stroke();
-                    ctx.restore();
-                });
-                
-                // Draw the interactive vertical line when user long-clicks (use global variable)
-                if (chart3IsLongClickActive && chart3ActiveDataIndex !== null && chart3ActiveDataIndex !== -1) {
-                    const x = xAxis.getPixelForValue(chart3ActiveDataIndex);
-                    
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.moveTo(x, yAxis.top);
-                    ctx.lineTo(x, yAxis.bottom);
-                    ctx.lineWidth = 2;
-                    ctx.strokeStyle = 'rgba(0, 102, 102, 0.6)';
-                    ctx.setLineDash([5, 5]);
-                    ctx.stroke();
-                    ctx.restore();
-                }
-            }
-        };
-
-        chart3Instance = new Chart(ctx3, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [
-                    { label: 'Heritage Centre', data: getSiteData(1), borderColor: '#366d75', tension: 0.3, fill: false, pointRadius: 3, pointHoverRadius: 5 },
-                    { label: 'Stadium Merdeka', data: getSiteData(2), borderColor: '#68d3d8', tension: 0.3, fill: false, pointRadius: 3, pointHoverRadius: 5 },
-                    { label: 'Suffolk House',   data: getSiteData(3), borderColor: '#4a6fa5', tension: 0.3, fill: false, pointRadius: 3, pointHoverRadius: 5 },
-                    { label: 'No. 8 Heeren Street', data: getSiteData(4), borderColor: '#f4d35e', tension: 0.3, fill: false, pointRadius: 3, pointHoverRadius: 5 },
-                    { label: 'Rumah Penghulu Abu Seman', data: getSiteData(5), borderColor: '#ee964b', tension: 0.3, fill: false, pointRadius: 3, pointHoverRadius: 5 }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: {
-                    mode: 'point',
-                    intersect: true
-                },
-                plugins: {
-                    title: { display: true, text: 'CONTRIBUTION INDEX BY MONTH AND YEAR' },
-                    legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
-                    tooltip: {
-                        enabled: true,
-                        mode: 'point',
-                        intersect: true,
-                        backgroundColor: 'rgba(0, 51, 77, 0.9)',
-                        titleColor: '#fff',
-                        bodyColor: '#fff',
-                        borderColor: '#006666',
-                        borderWidth: 2,
-                        padding: 12,
-                        displayColors: true,
-                        callbacks: {
-                            title: (tooltipItems) => {
-                                if (tooltipItems.length > 0) {
-                                    const dataIndex = tooltipItems[0].dataIndex;
-                                    if (allData[dataIndex]) {
-                                        return `${allData[dataIndex].month_name} ${allData[dataIndex].year}`;
-                                    }
-                                }
-                                return '';
-                            },
-                            label: (context) => {
-                                const value = context.parsed.y;
-                                if (value !== null && value !== undefined) {
-                                    return `${context.dataset.label}: ${value.toFixed(2)}`;
-                                }
-                                return `${context.dataset.label}: N/A`;
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: {
-                            drawOnChartArea: false,
-                            drawBorder: false
-                        }
-                    },
-                    y: { 
-                        beginAtZero: true, 
-                        title: { display: true, text: 'Contribution Index (0.00 - 1.00)' },
-                        grid: {
-                            color: 'rgba(200, 200, 200, 0.5)',
-                            drawBorder: false
-                        }
-                    }
-                }
-            },
-            plugins: [verticalLinePlugin]
-        });
-        
-        // Store for use in event handlers
-        chart3AllData = allData;
-        chart3Canvas = document.getElementById('chart3');
-        
-        // Setup long-click event listeners for the canvas
-        setupChart3LongClickListeners();
-    };
-    
-    // Setup long-click event listeners
-    const setupChart3LongClickListeners = () => {
-        const canvas = document.getElementById('chart3');
-        let previousActiveIndex = null;
-        
-        canvas.addEventListener('mousedown', (e) => {
-            if (e.button !== 0) return;
-            
-            chart3LongClickTimer = setTimeout(() => {
-                chart3IsLongClickActive = true;
-                canvas.style.cursor = 'crosshair';
-                
-                // Switch tooltip to index mode
-                chart3Instance.options.interaction.mode = 'index';
-                chart3Instance.options.interaction.intersect = false;
-                chart3Instance.options.plugins.tooltip.mode = 'index';
-                chart3Instance.options.plugins.tooltip.intersect = false;
-                
-                const points = chart3Instance.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
-                
-                if (points.length) {
-                    chart3ActiveDataIndex = points[0].index;
-                    previousActiveIndex = chart3ActiveDataIndex;
-                    
-                    const activeElements = chart3Instance.data.datasets.map((dataset, datasetIndex) => ({
-                        datasetIndex: datasetIndex,
-                        index: chart3ActiveDataIndex
-                    }));
-                    
-                    chart3Instance.setActiveElements(activeElements);
-                    chart3Instance.tooltip.setActiveElements(activeElements, { x: e.offsetX, y: e.offsetY });
-                    chart3Instance.tooltip.options.enabled = true;
-                    chart3Instance.update('none');
-                }
-            }, 500);
-        });
-        
-        canvas.addEventListener('mousemove', (e) => {
-            if (chart3IsLongClickActive) {
-                const points = chart3Instance.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
-                
-                if (points.length > 0) {
-                    const newActiveIndex = points[0].index;
-                    
-                    if (newActiveIndex !== previousActiveIndex) {
-                        chart3ActiveDataIndex = newActiveIndex;
-                        previousActiveIndex = newActiveIndex;
-                        
-                        const activeElements = chart3Instance.data.datasets.map((dataset, datasetIndex) => ({
-                            datasetIndex: datasetIndex,
-                            index: chart3ActiveDataIndex
-                        }));
-                        
-                        chart3Instance.setActiveElements(activeElements);
-                        chart3Instance.tooltip.setActiveElements(activeElements, { x: e.offsetX, y: e.offsetY });
-                        chart3Instance.update('none');
-                    } else {
-                        chart3Instance.tooltip.setActiveElements(
-                            chart3Instance.tooltip.getActiveElements(),
-                            { x: e.offsetX, y: e.offsetY }
-                        );
-                    }
-                }
-            }
-        });
-        
-        canvas.addEventListener('mouseup', () => {
-            clearTimeout(chart3LongClickTimer);
-            
-            if (chart3IsLongClickActive) {
-                chart3ActiveDataIndex = null;
-                previousActiveIndex = null;
-                chart3IsLongClickActive = false;
-                canvas.style.cursor = 'default';
-                
-                chart3Instance.options.interaction.mode = 'point';
-                chart3Instance.options.interaction.intersect = true;
-                chart3Instance.options.plugins.tooltip.mode = 'point';
-                chart3Instance.options.plugins.tooltip.intersect = true;
-                
-                chart3Instance.setActiveElements([]);
-                chart3Instance.tooltip.setActiveElements([], { x: 0, y: 0 });
-                chart3Instance.update();
-            }
-        });
-        
-        canvas.addEventListener('mouseleave', () => {
-            clearTimeout(chart3LongClickTimer);
-            if (chart3IsLongClickActive) {
-                chart3ActiveDataIndex = null;
-                previousActiveIndex = null;
-                chart3IsLongClickActive = false;
-                canvas.style.cursor = 'default';
-                
-                chart3Instance.options.interaction.mode = 'point';
-                chart3Instance.options.interaction.intersect = true;
-                chart3Instance.options.plugins.tooltip.mode = 'point';
-                chart3Instance.options.plugins.tooltip.intersect = true;
-                
-                chart3Instance.setActiveElements([]);
-                chart3Instance.tooltip.setActiveElements([], { x: 0, y: 0 });
-                chart3Instance.update();
-            }
-        });
-        
-        // Touch support
-        canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            const touch = e.touches[0];
-            
-            chart3LongClickTimer = setTimeout(() => {
-                chart3IsLongClickActive = true;
-                
-                chart3Instance.options.interaction.mode = 'index';
-                chart3Instance.options.interaction.intersect = false;
-                chart3Instance.options.plugins.tooltip.mode = 'index';
-                chart3Instance.options.plugins.tooltip.intersect = false;
-                
-                const rect = canvas.getBoundingClientRect();
-                const x = touch.clientX - rect.left;
-                const y = touch.clientY - rect.top;
-                
-                const points = chart3Instance.getElementsAtEventForMode(
-                    { x, y, native: e },
-                    'index',
-                    { intersect: false },
-                    true
-                );
-                
-                if (points.length) {
-                    chart3ActiveDataIndex = points[0].index;
-                    previousActiveIndex = chart3ActiveDataIndex;
-                    
-                    const activeElements = chart3Instance.data.datasets.map((dataset, datasetIndex) => ({
-                        datasetIndex: datasetIndex,
-                        index: chart3ActiveDataIndex
-                    }));
-                    
-                    chart3Instance.setActiveElements(activeElements);
-                    chart3Instance.tooltip.setActiveElements(activeElements, { x, y });
-                    chart3Instance.tooltip.options.enabled = true;
-                    chart3Instance.update('none');
-                }
-            }, 500);
-        });
-        
-        canvas.addEventListener('touchmove', (e) => {
-            if (chart3IsLongClickActive) {
-                e.preventDefault();
-                const rect = canvas.getBoundingClientRect();
-                const touch = e.touches[0];
-                const x = touch.clientX - rect.left;
-                const y = touch.clientY - rect.top;
-                
-                const points = chart3Instance.getElementsAtEventForMode(
-                    { x, y, native: e },
-                    'index',
-                    { intersect: false },
-                    true
-                );
-                
-                if (points.length) {
-                    const newActiveIndex = points[0].index;
-                    
-                    if (newActiveIndex !== previousActiveIndex) {
-                        chart3ActiveDataIndex = newActiveIndex;
-                        previousActiveIndex = newActiveIndex;
-                        
-                        const activeElements = chart3Instance.data.datasets.map((dataset, datasetIndex) => ({
-                            datasetIndex: datasetIndex,
-                            index: chart3ActiveDataIndex
-                        }));
-                        
-                        chart3Instance.setActiveElements(activeElements);
-                        chart3Instance.tooltip.setActiveElements(activeElements, { x, y });
-                        chart3Instance.update('none');
-                    } else {
-                        chart3Instance.tooltip.setActiveElements(
-                            chart3Instance.tooltip.getActiveElements(),
-                            { x, y }
-                        );
-                    }
-                }
-            } else {
-                clearTimeout(chart3LongClickTimer);
-            }
-        });
-        
-        canvas.addEventListener('touchend', () => {
-            clearTimeout(chart3LongClickTimer);
-            if (chart3IsLongClickActive) {
-                chart3ActiveDataIndex = null;
-                previousActiveIndex = null;
-                chart3IsLongClickActive = false;
-                
-                chart3Instance.options.interaction.mode = 'point';
-                chart3Instance.options.interaction.intersect = true;
-                chart3Instance.options.plugins.tooltip.mode = 'point';
-                chart3Instance.options.plugins.tooltip.intersect = true;
-                
-                chart3Instance.setActiveElements([]);
-                chart3Instance.tooltip.setActiveElements([], { x: 0, y: 0 });
-                chart3Instance.update();
-            }
-        });
-    };
-    
-    // Call renderChart3 with original data
-    renderChart3(originalMasterGraph);
-    initializeYearDropdowns();
+    // Render chart with master graph data
+    renderChart3Helper(apiData.master_graph);
 }
 
 function renderSiteCharts(apiData, siteKey) {

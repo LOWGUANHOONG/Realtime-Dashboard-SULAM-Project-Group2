@@ -156,17 +156,33 @@ def get_demographics_chart(filter_type, year=None, month=None):
     conn.close()
     return [dict(row) for row in rows]
 
-def get_master_contribution_index():
-    """Chart 3: Five separate lines for each cultural site"""
+def get_master_contribution_index(year=None, month=None):
+    """Chart 3: Five separate lines for each cultural site, filtered by selected date"""
     conn = get_db_connection()
-    # We ensure we select the site_id so the JS can filter it
+    
+    # Get the latest available month and year to determine filtering
+    if not year or not month:
+        # Get the latest available date
+        latest_query = """
+            SELECT MAX(year) as max_year, 
+                   MAX(month_num) as max_month 
+            FROM site_monthly_metrics 
+            WHERE year = (SELECT MAX(year) FROM site_monthly_metrics)
+        """
+        latest_row = conn.execute(latest_query).fetchone()
+        if latest_row:
+            year = latest_row['max_year']
+            month = latest_row['max_month']
+    
+    # Query data from start until selected month/year (treating selected date as "now")
     query = """
         SELECT year, month_num, month_name, site_id,
         ( (donations * 0.00004) + (sponsorships * 0.00004) + (volunteers * 0.002) ) as contribution_index
         FROM site_monthly_metrics
+        WHERE year < ? OR (year = ? AND month_num <= ?)
         ORDER BY year ASC, month_num ASC
     """
-    rows = conn.execute(query).fetchall()
+    rows = conn.execute(query, (year, year, month)).fetchall()
     conn.close()
     return [dict(row) for row in rows]
 

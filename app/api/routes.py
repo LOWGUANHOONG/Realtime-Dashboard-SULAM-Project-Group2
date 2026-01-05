@@ -31,7 +31,7 @@ def get_dashboard_data():
                 "kpis": get_bwm_kpi_cards(year, month) if year and month else get_bwm_kpi_cards(),
                 "membership_chart": get_org_membership_chart(year, month) if year and month else get_org_membership_chart(),
                 "demographics": get_demographics_chart(demographic_type, year, month) if year and month else get_demographics_chart(demographic_type),
-                "master_graph": get_master_contribution_index()
+                "master_graph": get_master_contribution_index(year, month) if year and month else get_master_contribution_index()
             }
         else:
             # --- SPECIFIC SITE DATA ---
