@@ -29,7 +29,7 @@ def get_dashboard_data():
             payload = {
                 "view": "overview",
                 "kpis": get_bwm_kpi_cards(year, month) if year and month else get_bwm_kpi_cards(),
-                "membership_chart": get_org_membership_chart(),
+                "membership_chart": get_org_membership_chart(year, month) if year and month else get_org_membership_chart(),
                 "demographics": get_demographics_chart(demographic_type, year, month) if year and month else get_demographics_chart(demographic_type),
                 "master_graph": get_master_contribution_index()
             }

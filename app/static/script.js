@@ -14,15 +14,19 @@ const siteIdMap = {
 };
 
 // Global variables for date selection
-let selectedYear = 2025;
-let selectedMonth = 1;
+let selectedYear = null;
+let selectedMonth = null;
 let latestAvailableYear = 2025;
-let latestAvailableMonth = 1;
+let latestAvailableMonth = 12;
 let isDateSelectorOpen = false;
+let isInitialLoad = true; // Flag to track first page load
+let currentDemoFilter = 'age'; // Track current demographic filter
 const availableYears = [2021, 2022, 2023, 2024, 2025];
 const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 let chart3ActiveDataIndex = -1;
 let chart3AllData = [];
+let chart3IsLongClickActive = false;
+let chart3LongClickTimer = null;
 
 document.addEventListener("DOMContentLoaded", function () {
     // Ensure the BWM box is active on initial load
@@ -33,6 +37,7 @@ document.addEventListener("DOMContentLoaded", function () {
     
     // Initial load: BWM Overview
     fetchAndRender();
+    isInitialLoad = false; // Mark initial load complete after first fetch
 
     // Listen for Demographic Filter changes (Age/Gender)
     const dropdown = document.getElementById('demographicFilter');
@@ -46,11 +51,19 @@ document.addEventListener("DOMContentLoaded", function () {
 // ==========================================
 // PART 2: DATA FETCHING
 // ==========================================
-async function fetchAndRender(siteKey = null, demoFilter = 'age') {
-    let url = `/api/data?demo_filter=${demoFilter}`;
+async function fetchAndRender(siteKey = null, demoFilter = null) {
+    // Use provided demoFilter or fall back to currentDemoFilter
+    const filterToUse = demoFilter || currentDemoFilter;
+    
+    let url = `/api/data?demo_filter=${filterToUse}`;
     const siteId = siteKey ? siteIdMap[siteKey] : null;
 
     if (siteId) url += `&site_id=${siteId}`;
+    
+    // Include selected year and month for overview (to persist date selection after initial load)
+    if (!siteId && selectedYear && selectedMonth) {
+        url += `&year=${selectedYear}&month=${selectedMonth}`;
+    }
 
     try {
         const response = await fetch(url);
@@ -79,6 +92,9 @@ async function fetchAndRender(siteKey = null, demoFilter = 'age') {
 
 // Update only the demographic chart when filter changes
 async function updateDemographicChartOnly(demoFilter) {
+    // Store the current filter
+    currentDemoFilter = demoFilter;
+    
     try {
         const response = await fetch(`/api/data?demo_filter=${demoFilter}`);
         const result = await response.json();
@@ -182,8 +198,11 @@ function updateDataPeriod(apiData, siteKey) {
     if (latestYear && latestMonthNum) {
         latestAvailableYear = latestYear;
         latestAvailableMonth = latestMonthNum;
-        selectedYear = latestYear;
-        selectedMonth = latestMonthNum;
+        // If selectedYear/selectedMonth are not set yet (null), set them from database max
+        if (!selectedYear || !selectedMonth) {
+            selectedYear = latestYear;
+            selectedMonth = latestMonthNum;
+        }
     }
 
     // Update the header with the latest period
@@ -308,7 +327,8 @@ function updateDateSelectorDisplay() {
 // Fetch data for selected date
 async function fetchDataForSelectedDate() {
     try {
-        const response = await fetch(`/api/data?year=${selectedYear}&month=${selectedMonth}`);
+        // Use the stored current demographic filter
+        const response = await fetch(`/api/data?year=${selectedYear}&month=${selectedMonth}&demo_filter=${currentDemoFilter}`);
         const result = await response.json();
         
         if (result.status === "success") {
@@ -316,6 +336,41 @@ async function fetchDataForSelectedDate() {
             
             // Update KPI cards
             updateKPICards(apiData.kpis, 'overview');
+            
+            // Update Chart 1: Membership chart filtered by latest available month/year
+            // Backend now handles filtering and aggregation
+            if (chart1Instance) chart1Instance.destroy();
+            const ctx1 = document.getElementById('chart1');
+            
+            const years = apiData.membership_chart.map(item => item.year);
+            const generalMembersData = apiData.membership_chart.map(item => item.avg_members || 0);
+            const councilMembersData = apiData.membership_chart.map(item => item.avg_council || 0);
+            
+            chart1Instance = new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: years,
+                    datasets: [
+                        { 
+                            label: 'General Members', 
+                            data: generalMembersData, 
+                            backgroundColor: '#68d3d8' 
+                        },
+                        { 
+                            label: 'Council Members', 
+                            data: councilMembersData, 
+                            backgroundColor: '#4a6fa5' 
+                        }
+                    ]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { x: { stacked: true }, y: { stacked: true } },
+                    plugins: { title: { display: true, text: 'AVERAGE ANNUAL MEMBERSHIP COMPOSITION' } }
+                }
+            });
             
             // Update demographics chart (chart 2)
             if (chart2Instance) chart2Instance.destroy();
@@ -401,7 +456,12 @@ function renderOverviewCharts(apiData) {
 
     // --- CHART 1: HORIZONTAL STACKED MEMBERSHIP ---
     const ctx1 = document.getElementById('chart1');
+    
+    // Backend now handles filtering and aggregation based on latest year/month
+    // Just extract years and data from the response
     const years = apiData.membership_chart.map(item => item.year);
+    const generalMembersData = apiData.membership_chart.map(item => item.avg_members || 0);
+    const councilMembersData = apiData.membership_chart.map(item => item.avg_council || 0);
     
     chart1Instance = new Chart(ctx1, {
         type: 'bar',
@@ -410,12 +470,12 @@ function renderOverviewCharts(apiData) {
             datasets: [
                 { 
                     label: 'General Members', 
-                    data: apiData.membership_chart.map(item => item.avg_members || 0), 
+                    data: generalMembersData, 
                     backgroundColor: '#68d3d8' 
                 },
                 { 
                     label: 'Council Members', 
-                    data: apiData.membership_chart.map(item => item.avg_council || 0), 
+                    data: councilMembersData, 
                     backgroundColor: '#4a6fa5' 
                 }
             ]
@@ -567,7 +627,7 @@ function renderOverviewCharts(apiData) {
                 });
                 
                 // Draw the interactive vertical line when user long-clicks (use global variable)
-                if (chart3ActiveDataIndex !== null) {
+                if (chart3IsLongClickActive && chart3ActiveDataIndex !== null && chart3ActiveDataIndex !== -1) {
                     const x = xAxis.getPixelForValue(chart3ActiveDataIndex);
                     
                     ctx.save();
@@ -939,6 +999,12 @@ function showOverview() {
     // Add active class to BWM box when showing overview
     const bwmBox = document.querySelector('.new-site');
     if (bwmBox) bwmBox.classList.add('active');
+    
+    // Sync the dropdown to the current filter
+    const dropdown = document.getElementById('demographicFilter');
+    if (dropdown) {
+        dropdown.value = currentDemoFilter;
+    }
     
     fetchAndRender();
 }

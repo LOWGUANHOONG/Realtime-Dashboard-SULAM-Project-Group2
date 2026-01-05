@@ -88,20 +88,38 @@ def get_site_kpi_cards(site_id):
 # 2. OVERVIEW CHARTS (BWM LANDING)
 # ==========================================
 
-def get_org_membership_chart():
+def get_org_membership_chart(year=None, month=None):
     conn = get_db_connection()
-    # Ensure the table name matches your actual SQLite database schema
+    
+    # Get the latest available month and year to determine filtering
+    if not year or not month:
+        # Get the latest available date
+        latest_query = """
+            SELECT MAX(year) as max_year, 
+                   MAX(month_num) as max_month 
+            FROM org_stats 
+            WHERE year = (SELECT MAX(year) FROM org_stats)
+        """
+        latest_row = conn.execute(latest_query).fetchone()
+        if latest_row:
+            year = latest_row['max_year']
+            month = latest_row['max_month']
+    
+    # Query: For complete years (before the latest year), show full year average
+    # For the latest year, show only JAN to current month
     query = """
         SELECT 
             year,
             ROUND(AVG(total_members)) as avg_members,
-            ROUND(AVG(council_members)) as avg_council
+            ROUND(AVG(council_members)) as avg_council,
+            COUNT(*) as month_count
         FROM org_stats 
+        WHERE (year < ? OR (year = ? AND month_num <= ?))
         GROUP BY year
         ORDER BY year ASC
     """
     try:
-        rows = conn.execute(query).fetchall()
+        rows = conn.execute(query, (year, year, month)).fetchall()
         return [dict(row) for row in rows]
     except Exception as e:
         print(f"Error in Membership Query: {e}") # Check your terminal for this!
