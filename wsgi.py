@@ -8,6 +8,7 @@ scheduler = BackgroundScheduler()
 # Runs every 5 seconds, but the Hash logic above ensures it only does 
 # heavy work if you actually edited the Google Sheet
 # wsgi.py
+# wsgi.py or etl_functions.py
 scheduler.add_job(func=run_etl, trigger="interval", seconds=20, max_instances=1, coalesce=True)
 scheduler.start()
 

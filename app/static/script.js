@@ -66,21 +66,18 @@ document.addEventListener("DOMContentLoaded", function () {
     const socket = io();
     socket.on('data_updated', function(msg) {
         console.log("Sync Received:", msg.message);
-        updateSyncStatus();
-
-        setTimeout(() => {
-            fetchAndRender(currentSiteKey); 
-        }, 1000);
         
-        // Update the timestamp UI immediately
+        // 1. Update visual feedback immediately
         const statusLabel = document.getElementById('sync-status');
         if (statusLabel) {
             const now = new Date().toLocaleTimeString();
             statusLabel.innerHTML = `🟢 Live: Last updated at ${now}`;
-            statusLabel.style.transition = '0.3s';
-            statusLabel.style.color = '#00ff00';
-            setTimeout(() => { statusLabel.style.color = 'white'; }, 1000);
         }
+
+        // 2. ONLY ONE fetch call with a 1-second delay
+        setTimeout(() => {
+            fetchAndRender(currentSiteKey); 
+        }, 1000); 
     });
 });
 
@@ -782,9 +779,9 @@ function setupChart3LongClickListeners() {
 }
 
 function renderOverviewCharts(apiData) {
-    // 1. Safety Guard: Don't crash if data is missing
-    if (!apiData || !apiData.membership_chart) {
-        console.warn("Real-time data not ready. Holding current view.");
+    // 1. SAFETY GUARD: Don't crash if data is missing or empty
+    if (!apiData || !apiData.membership_chart || apiData.membership_chart.length === 0) {
+        console.warn("API data incomplete, keeping current view.");
         return; 
     }
 
@@ -868,10 +865,10 @@ function renderOverviewCharts(apiData) {
 }
 
 function renderSiteCharts(apiData, siteKey) {
-    // 1. Safety Guard: Don't crash if data is missing
-    if (!apiData || !apiData.membership_chart) {
-        console.warn("Real-time data not ready. Holding current view.");
-        return; 
+    // 1. SAFETY GUARD
+    if (!apiData || !apiData.charts || apiData.charts.length === 0) {
+        console.warn("Site data not ready.");
+        return;
     }
 
     if (chart1Instance) chart1Instance.destroy();
