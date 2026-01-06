@@ -1282,7 +1282,6 @@ function setupSiteChartLongPress(chartKey, chartInstance) {
     
     canvas.addEventListener('mousemove', (e) => {
         if (siteChartLongClickActive[chartKey]) {
-            // Long-press mode: keep existing synced behavior
             const points = chartInstance.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
             
             if (points.length > 0) {
@@ -1305,28 +1304,6 @@ function setupSiteChartLongPress(chartKey, chartInstance) {
                     // Index same - just update tooltip position for smooth cursor tracking
                     updateTooltipPositionsOnAllCharts();
                 }
-            }
-        } else {
-            // Hover mode: mirror the synced effect across charts using nearest point on hover
-            const points = chartInstance.getElementsAtEventForMode(e, 'nearest', { intersect: true }, true);
-            if (points.length > 0) {
-                const newActiveIndex = points[0].index;
-                if (newActiveIndex !== syncedLineIndex || siteChartActiveIndex[chartKey] !== newActiveIndex) {
-                    siteChartActiveIndex[chartKey] = newActiveIndex;
-                    syncedLineIndex = newActiveIndex;
-                    syncedLineT = null; // Use exact point location
-                    const activeElements = [{ datasetIndex: 0, index: syncedLineIndex }];
-                    setActiveElementsOnAllCharts(activeElements);
-                    updateAllCharts('none');
-                } else {
-                    updateTooltipPositionsOnAllCharts();
-                }
-            } else {
-                // No point under cursor: clear synced state softly
-                syncedLineIndex = -1;
-                syncedLineT = null;
-                clearAllChartsActiveElements();
-                updateAllCharts('none');
             }
         }
     });
@@ -1387,12 +1364,6 @@ function setupSiteChartLongPress(chartKey, chartInstance) {
             
             // Start fade-out animation for the line
             startLinesFadeOut();
-        } else {
-            // Hover-only: clear synced state on exit without fade animation
-            syncedLineIndex = -1;
-            syncedLineT = null;
-            clearAllChartsActiveElements();
-            updateAllCharts('none');
         }
     });
     
