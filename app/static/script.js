@@ -66,6 +66,11 @@ document.addEventListener("DOMContentLoaded", function () {
     const socket = io();
     socket.on('data_updated', function(msg) {
         console.log("Sync Received:", msg.message);
+        updateSyncStatus();
+
+        setTimeout(() => {
+            fetchAndRender(currentSiteKey); 
+        }, 1000);
         
         // Update the timestamp UI immediately
         const statusLabel = document.getElementById('sync-status');
@@ -76,13 +81,6 @@ document.addEventListener("DOMContentLoaded", function () {
             statusLabel.style.color = '#00ff00';
             setTimeout(() => { statusLabel.style.color = 'white'; }, 1000);
         }
-
-        // ONLY ONE FETCH CALL: Wait 1 second (1000ms) 
-        // This gives the Python script time to finish writing and avoids the 429 error.
-        setTimeout(() => {
-            console.log("Auto-refreshing charts for:", currentSiteKey || "Overview");
-            fetchAndRender(currentSiteKey); 
-        }, 1000); 
     });
 });
 
@@ -784,10 +782,10 @@ function setupChart3LongClickListeners() {
 }
 
 function renderOverviewCharts(apiData) {
-    // Check if the expected data arrays exist before trying to map them
-    if (!apiData || !apiData.membership_chart || apiData.membership_chart.length === 0) {
-        console.warn("Data not ready or empty. Skipping chart render.");
-        return; // Prevents the crash that leads to white boxes
+    // 1. Safety Guard: Don't crash if data is missing
+    if (!apiData || !apiData.membership_chart) {
+        console.warn("Real-time data not ready. Holding current view.");
+        return; 
     }
 
     // Cleanup old instances to prevent "ghost" charts
@@ -870,11 +868,12 @@ function renderOverviewCharts(apiData) {
 }
 
 function renderSiteCharts(apiData, siteKey) {
-    if (!apiData || Object.keys(apiData).length === 0) {
-        console.error("No data received from API");
-        return; // Don't crash Chart.js if the API is momentarily empty
+    // 1. Safety Guard: Don't crash if data is missing
+    if (!apiData || !apiData.membership_chart) {
+        console.warn("Real-time data not ready. Holding current view.");
+        return; 
     }
-    
+
     if (chart1Instance) chart1Instance.destroy();
     if (chart2Instance) chart2Instance.destroy();
     if (chart3Instance) chart3Instance.destroy();
