@@ -35,9 +35,13 @@ let siteChartLongClickActive = { chart1: false, chart2: false, chart3: false };
 let siteChartLongClickTimer = { chart1: null, chart2: null, chart3: null };
 let siteChartData = { chart1: [], chart2: [], chart3: [] };
 
+// Default Chart.js events snapshot for restore
+const chartDefaultEvents = (typeof Chart !== 'undefined' && Chart.defaults && Array.isArray(Chart.defaults.events))
+    ? [...Chart.defaults.events]
+    : ['mousemove', 'mouseout', 'click', 'touchstart', 'touchmove', 'touchend'];
+
 // Global synchronized line state for site charts
 let syncedLineIndex = -1; // Shared index across all 3 charts
-let syncedLineT = null; // Normalized x-position (0-1) for smoother cross-chart line
 let syncedLineOpacity = 1; // For fade-out effect
 let fadeOutInterval = null; // Animation interval
 
@@ -873,14 +877,10 @@ function renderSiteCharts(apiData, siteKey) {
                 const xAxis = chart.scales.x;
                 const yAxis = chart.scales.y;
                 
-                // Use exact index position when we have one; fall back to normalized position if only cursor T is known
-                let x;
+                // Use exact index position for perfect alignment across charts
                 const indexToDraw = syncedLineIndex !== -1 ? syncedLineIndex : siteChartActiveIndex[chartKey];
-                if (indexToDraw !== -1) {
-                    x = xAxis.getPixelForValue(indexToDraw);
-                } else if (syncedLineT !== null) {
-                    x = xAxis.left + syncedLineT * (xAxis.right - xAxis.left);
-                }
+                if (indexToDraw === -1) return;
+                const x = xAxis.getPixelForValue(indexToDraw);
                 
                 ctx.save();
                 ctx.beginPath();
@@ -1105,22 +1105,36 @@ function renderSiteCharts(apiData, siteKey) {
     setupSiteChartLongPress('chart3', chart3Instance);
 }
 
+// Build safe active elements for a chart, clamping index to available data
+function buildActiveElementsForChart(chart, sharedIndex) {
+    if (!chart || !chart.data || !chart.data.datasets || chart.data.datasets.length === 0) return [];
+    const labelsLen = Array.isArray(chart.data.labels) ? chart.data.labels.length : 0;
+    const dataLen = chart.data.datasets[0].data ? chart.data.datasets[0].data.length : 0;
+    const maxIndex = Math.max(labelsLen - 1, dataLen - 1);
+    if (maxIndex < 0) return [];
+    const clampedIndex = Math.min(Math.max(sharedIndex, 0), maxIndex);
+    return [{ datasetIndex: 0, index: clampedIndex }];
+}
+
 // Helper functions for managing all 3 site charts
 function setActiveElementsOnAllCharts(activeElements) {
     if (chart1Instance) {
-        chart1Instance.setActiveElements(activeElements);
+        const elems = buildActiveElementsForChart(chart1Instance, activeElements[0].index);
+        chart1Instance.setActiveElements(elems);
         chart1Instance.tooltip.options.enabled = true;
-        chart1Instance.tooltip.setActiveElements(activeElements);
+        chart1Instance.tooltip.setActiveElements(elems);
     }
     if (chart2Instance) {
-        chart2Instance.setActiveElements(activeElements);
+        const elems = buildActiveElementsForChart(chart2Instance, activeElements[0].index);
+        chart2Instance.setActiveElements(elems);
         chart2Instance.tooltip.options.enabled = true;
-        chart2Instance.tooltip.setActiveElements(activeElements);
+        chart2Instance.tooltip.setActiveElements(elems);
     }
     if (chart3Instance) {
-        chart3Instance.setActiveElements(activeElements);
+        const elems = buildActiveElementsForChart(chart3Instance, activeElements[0].index);
+        chart3Instance.setActiveElements(elems);
         chart3Instance.tooltip.options.enabled = true;
-        chart3Instance.tooltip.setActiveElements(activeElements);
+        chart3Instance.tooltip.setActiveElements(elems);
     }
 }
 
@@ -1213,7 +1227,6 @@ function startLinesFadeOut() {
             fadeOutInterval = null;
             syncedLineIndex = -1;
             syncedLineOpacity = 1;
-            syncedLineT = null;
             
             // Clear tooltips completely when line fades out
             clearAllChartsActiveElements();
@@ -1247,20 +1260,7 @@ function setupSiteChartLongPress(chartKey, chartInstance) {
         siteChartLongClickTimer[chartKey] = setTimeout(() => {
             siteChartLongClickActive[chartKey] = true;
             canvas.style.cursor = 'crosshair';
-            
-            // Change tooltip mode to index for synced tooltips across all charts
-            if (chart1Instance) {
-                chart1Instance.options.interaction.mode = 'index';
-                chart1Instance.options.interaction.intersect = false;
-            }
-            if (chart2Instance) {
-                chart2Instance.options.interaction.mode = 'index';
-                chart2Instance.options.interaction.intersect = false;
-            }
-            if (chart3Instance) {
-                chart3Instance.options.interaction.mode = 'index';
-                chart3Instance.options.interaction.intersect = false;
-            }
+            setSiteChartsPressMode(true); // disable events + force index mode
             
             const points = chartInstance.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
             
@@ -1268,10 +1268,6 @@ function setupSiteChartLongPress(chartKey, chartInstance) {
                 siteChartActiveIndex[chartKey] = points[0].index;
                 syncedLineIndex = points[0].index; // Sync across all charts
                 previousActiveIndex = syncedLineIndex;
-                // Capture normalized cursor position for smooth cross-chart line
-                const scale = chartInstance.scales.x;
-                const t = (e.offsetX - scale.left) / (scale.right - scale.left);
-                syncedLineT = Math.min(1, Math.max(0, t));
                 
                 const activeElements = [{ datasetIndex: 0, index: syncedLineIndex }];
                 setActiveElementsOnAllCharts(activeElements);
@@ -1292,10 +1288,6 @@ function setupSiteChartLongPress(chartKey, chartInstance) {
                     siteChartActiveIndex[chartKey] = newActiveIndex;
                     syncedLineIndex = newActiveIndex; // Sync across all charts
                     previousActiveIndex = newActiveIndex;
-                    // Update normalized position for cross-chart smoothness
-                    const scale = chartInstance.scales.x;
-                    const t = (e.offsetX - scale.left) / (scale.right - scale.left);
-                    syncedLineT = Math.min(1, Math.max(0, t));
                     
                     const activeElements = [{ datasetIndex: 0, index: syncedLineIndex }];
                     setActiveElementsOnAllCharts(activeElements);
@@ -1304,6 +1296,9 @@ function setupSiteChartLongPress(chartKey, chartInstance) {
                     // Index same - just update tooltip position for smooth cursor tracking
                     updateTooltipPositionsOnAllCharts();
                 }
+            } else {
+                // No point under cursor: keep showing current info while pressed
+                updateTooltipPositionsOnAllCharts();
             }
         }
     });
@@ -1316,19 +1311,8 @@ function setupSiteChartLongPress(chartKey, chartInstance) {
             siteChartLongClickActive[chartKey] = false;
             canvas.style.cursor = 'default';
             
-            // Reset interaction mode back to point
-            if (chart1Instance) {
-                chart1Instance.options.interaction.mode = 'point';
-                chart1Instance.options.interaction.intersect = true;
-            }
-            if (chart2Instance) {
-                chart2Instance.options.interaction.mode = 'point';
-                chart2Instance.options.interaction.intersect = true;
-            }
-            if (chart3Instance) {
-                chart3Instance.options.interaction.mode = 'point';
-                chart3Instance.options.interaction.intersect = true;
-            }
+            // Reset interaction mode and events back to defaults
+            setSiteChartsPressMode(false);
             
             // Clear tooltips on ALL 3 charts
             clearAllChartsActiveElements();
@@ -1345,19 +1329,8 @@ function setupSiteChartLongPress(chartKey, chartInstance) {
             siteChartLongClickActive[chartKey] = false;
             canvas.style.cursor = 'default';
             
-            // Reset interaction mode back to point
-            if (chart1Instance) {
-                chart1Instance.options.interaction.mode = 'point';
-                chart1Instance.options.interaction.intersect = true;
-            }
-            if (chart2Instance) {
-                chart2Instance.options.interaction.mode = 'point';
-                chart2Instance.options.interaction.intersect = true;
-            }
-            if (chart3Instance) {
-                chart3Instance.options.interaction.mode = 'point';
-                chart3Instance.options.interaction.intersect = true;
-            }
+            // Reset interaction mode and events back to defaults
+            setSiteChartsPressMode(false);
             
             // Clear tooltips on ALL 3 charts
             clearAllChartsActiveElements();
@@ -1378,24 +1351,12 @@ function setupSiteChartLongPress(chartKey, chartInstance) {
             fadeOutInterval = null;
         }
             syncedLineOpacity = 1;
-            syncedLineT = null;
         
         siteChartLongClickTimer[chartKey] = setTimeout(() => {
             siteChartLongClickActive[chartKey] = true;
             
-            // Change tooltip mode to index for synced tooltips across all charts
-            if (chart1Instance) {
-                chart1Instance.options.interaction.mode = 'index';
-                chart1Instance.options.interaction.intersect = false;
-            }
-            if (chart2Instance) {
-                chart2Instance.options.interaction.mode = 'index';
-                chart2Instance.options.interaction.intersect = false;
-            }
-            if (chart3Instance) {
-                chart3Instance.options.interaction.mode = 'index';
-                chart3Instance.options.interaction.intersect = false;
-            }
+            // Disable hover events and force index mode during long press
+            setSiteChartsPressMode(true);
             
             const rect = canvas.getBoundingClientRect();
             const x = touch.clientX - rect.left;
@@ -1412,10 +1373,7 @@ function setupSiteChartLongPress(chartKey, chartInstance) {
                 siteChartActiveIndex[chartKey] = points[0].index;
                 syncedLineIndex = points[0].index; // Sync across all charts
                 previousActiveIndex = syncedLineIndex;
-                // Capture normalized touch position for smooth cross-chart line
-                const scale = chartInstance.scales.x;
-                const t = (x - scale.left) / (scale.right - scale.left);
-                syncedLineT = Math.min(1, Math.max(0, t));
+                // Normalized position not needed when syncing by index
                 
                 const activeElements = [{ datasetIndex: 0, index: syncedLineIndex }];
                 setActiveElementsOnAllCharts(activeElements);
@@ -1447,10 +1405,7 @@ function setupSiteChartLongPress(chartKey, chartInstance) {
                     siteChartActiveIndex[chartKey] = newActiveIndex;
                     syncedLineIndex = newActiveIndex; // Sync across all charts
                     previousActiveIndex = newActiveIndex;
-                    // Update normalized position for cross-chart smoothness
-                    const scale = chartInstance.scales.x;
-                    const t = (x - scale.left) / (scale.right - scale.left);
-                    syncedLineT = Math.min(1, Math.max(0, t));
+                    // Syncing purely by index
                     
                     const activeElements = [{ datasetIndex: 0, index: syncedLineIndex }];
                     setActiveElementsOnAllCharts(activeElements);
@@ -1459,6 +1414,9 @@ function setupSiteChartLongPress(chartKey, chartInstance) {
                     // Index same - just update tooltip position for smooth cursor tracking
                     updateTooltipPositionsOnAllCharts();
                 }
+            } else {
+                // No point under finger: keep showing current info while pressed
+                updateTooltipPositionsOnAllCharts();
             }
         } else {
             clearTimeout(siteChartLongClickTimer[chartKey]);
@@ -1471,19 +1429,8 @@ function setupSiteChartLongPress(chartKey, chartInstance) {
             siteChartActiveIndex[chartKey] = -1;
             siteChartLongClickActive[chartKey] = false;
             
-            // Reset interaction mode back to point
-            if (chart1Instance) {
-                chart1Instance.options.interaction.mode = 'point';
-                chart1Instance.options.interaction.intersect = true;
-            }
-            if (chart2Instance) {
-                chart2Instance.options.interaction.mode = 'point';
-                chart2Instance.options.interaction.intersect = true;
-            }
-            if (chart3Instance) {
-                chart3Instance.options.interaction.mode = 'point';
-                chart3Instance.options.interaction.intersect = true;
-            }
+            // Reset interaction mode and events back to defaults
+            setSiteChartsPressMode(false);
             
             // Clear tooltips on ALL 3 charts
             clearAllChartsActiveElements();
@@ -1525,4 +1472,26 @@ function showOverview() {
     }
     
     fetchAndRender();
+}
+
+// Toggle long-press mode on all site charts: disable default hover events and force index mode
+function setSiteChartsPressMode(active) {
+    const interactionMode = active ? 'index' : 'point';
+    const intersect = !active;
+    const eventsValue = active ? [] : chartDefaultEvents;
+    if (chart1Instance) {
+        chart1Instance.options.interaction.mode = interactionMode;
+        chart1Instance.options.interaction.intersect = intersect;
+        chart1Instance.options.events = eventsValue;
+    }
+    if (chart2Instance) {
+        chart2Instance.options.interaction.mode = interactionMode;
+        chart2Instance.options.interaction.intersect = intersect;
+        chart2Instance.options.events = eventsValue;
+    }
+    if (chart3Instance) {
+        chart3Instance.options.interaction.mode = interactionMode;
+        chart3Instance.options.interaction.intersect = intersect;
+        chart3Instance.options.events = eventsValue;
+    }
 }
