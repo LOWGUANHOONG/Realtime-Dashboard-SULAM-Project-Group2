@@ -1,5 +1,6 @@
 # 📊 Real-time Community Contribution Dashboard (SULAM Project)
 
+
 A real-time data visualization dashboard developed for **Badan Warisan Malaysia (BWM)**. This project automates the extraction of data from Google Sheets (the data source where the organization stores their data), processes it through an ETL pipeline, and visualizes cultural site metrics and organizational demographics using a modern web stack.
 
 ---
