@@ -3,6 +3,8 @@ import pandas as pd
 import sqlite3
 import os
 import re
+import hashlib
+import json
 from oauth2client.service_account import ServiceAccountCredentials
 
 # --- LEAD'S CONFIGURATION ---
@@ -62,41 +64,50 @@ def clean_numeric(value):
         return int(num) if num == int(num) else num
     except ValueError: return 0
 
+# To track last hashes for change detection
+last_hashes = {}
+
 def run_etl():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     try:
         # File path setups
         current_dir = os.path.dirname(os.path.abspath(__file__))
         db_path = os.path.abspath(os.path.join(current_dir, "../../app/database/dashboard.db"))
-        schema_path = os.path.abspath(os.path.join(current_dir, "../../app/database/schema.sql"))
         creds_path = os.path.abspath(os.path.join(current_dir, "../../service-account-key.json"))
 
-        # 1. Reset Database
-        if os.path.exists(db_path):
-            os.remove(db_path)
-            print("🗑️ Database wiped for clean sync.")
-
         conn = sqlite3.connect(db_path)
-        with open(schema_path, 'r') as f:
-            conn.executescript(f.read())
-        print("📜 Schema applied successfully.")
 
         # 2. Authenticate and Open Spreadsheet
         creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
         client = gspread.authorize(creds)
         spreadsheet = client.open("BWM data source (SULAM)")
-        
-        print("--- Starting Pipeline ---")
+
+        data_changed = False
 
         for sheet in spreadsheet.worksheets():
             tab_name = sheet.title
             if tab_name not in TABLE_MAP: continue
-            table_name = TABLE_MAP[tab_name]
             
             # Fetch data from Google Sheets
-            data = sheet.get_all_values(value_render_option='UNFORMATTED_VALUE')
-            if not data: continue
-            df = pd.DataFrame(data)
+            raw_data = sheet.get_all_values(value_render_option='UNFORMATTED_VALUE')
+            if not raw_data: continue
+
+            # --- HASH CHECK START ---
+            # Create a unique string representing the entire sheet content
+            current_hash = hashlib.md5(json.dumps(raw_data).encode('utf-8')).hexdigest()
+            
+            # If the hash hasn't changed, skip this sheet
+            if last_hashes.get(tab_name) == current_hash:
+                continue 
+            
+            # Data has changed, update the hash and set flag
+            last_hashes[tab_name] = current_hash
+            data_changed = True
+            # --- HASH CHECK END ---
+
+            # Process the data as usual since it is new or changed
+            table_name = TABLE_MAP[tab_name]
+            df = pd.DataFrame(raw_data)
 
             # 3. Dynamic Header Detection
             header_idx = None
@@ -145,11 +156,16 @@ def run_etl():
                 
                 # 4. Save to SQLite
                 if not df.empty:
-                    df.to_sql(table_name, conn, if_exists='append', index=False)
-                    print(f"✅ SUCCESS: {tab_name} -> Table '{table_name}' ({len(df)} rows)")
+                    df.to_sql(table_name, conn, if_exists='replace', index=False)
 
         conn.close()
-        print("--- All Data Successfully Synced ---")
+        # Only notify frontend if something actually changed
+        if data_changed:
+            from app import socketio
+            socketio.emit('data_updated', {'message': 'Real-time sync complete'})
+            print("🚀 Data change detected. Frontend notified.")
+        else:
+            print("💤 No changes in Google Sheets. Skipping update.")
         
     except Exception as e:
         print(f"❌ PIPELINE ERROR: {e}")

@@ -1,9 +1,18 @@
 from app import create_app, socketio
+from apscheduler.schedulers.background import BackgroundScheduler
+from app.data_pipeline.etl_functions import run_etl
 
-# Create the app instance using the factory we just built
 app = create_app()
 
+scheduler = BackgroundScheduler()
+# Runs every 5 seconds, but the Hash logic above ensures it only does 
+# heavy work if you actually edited the Google Sheet
+# wsgi.py
+scheduler.add_job(func=run_etl, trigger="interval", seconds=20, max_instances=1, coalesce=True)
+scheduler.start()
+
 if __name__ == "__main__":
-    # Run the server on http://127.0.0.1:5000
-    # use_reloader=True means the server restarts automatically when you save code
-    socketio.run(app, debug=True)
+    try:
+        socketio.run(app, debug=True)
+    except (KeyboardInterrupt, SystemExit):
+        scheduler.shutdown()

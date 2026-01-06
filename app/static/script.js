@@ -46,24 +46,44 @@ let syncedLineOpacity = 1; // For fade-out effect
 let fadeOutInterval = null; // Animation interval
 
 document.addEventListener("DOMContentLoaded", function () {
-    // Ensure the BWM box is active on initial load
+    // 1. Initial UI Setup
     const bwmBox = document.querySelector('.new-site');
-    if (bwmBox) {
-        bwmBox.classList.add('active');
-    }
+    if (bwmBox) { bwmBox.classList.add('active'); }
     
-    // Initial load: BWM Overview
-    currentSiteKey = null; // Start in overview mode
+    currentSiteKey = null; 
     fetchAndRender();
-    isInitialLoad = false; // Mark initial load complete after first fetch
+    isInitialLoad = false; 
 
-    // Listen for Demographic Filter changes (Age/Gender)
+    // 2. Filter Listener
     const dropdown = document.getElementById('demographicFilter');
     if (dropdown) {
         dropdown.addEventListener('change', function() {
             updateDemographicChartOnly(this.value);
         });
     }
+
+    // 3. CLEANED Real-time Listener (Socket.IO)
+    const socket = io();
+    socket.on('data_updated', function(msg) {
+        console.log("Sync Received:", msg.message);
+        
+        // Update the timestamp UI immediately
+        const statusLabel = document.getElementById('sync-status');
+        if (statusLabel) {
+            const now = new Date().toLocaleTimeString();
+            statusLabel.innerHTML = `🟢 Live: Last updated at ${now}`;
+            statusLabel.style.transition = '0.3s';
+            statusLabel.style.color = '#00ff00';
+            setTimeout(() => { statusLabel.style.color = 'white'; }, 1000);
+        }
+
+        // ONLY ONE FETCH CALL: Wait 1 second (1000ms) 
+        // This gives the Python script time to finish writing and avoids the 429 error.
+        setTimeout(() => {
+            console.log("Auto-refreshing charts for:", currentSiteKey || "Overview");
+            fetchAndRender(currentSiteKey); 
+        }, 1000); 
+    });
 });
 
 // ==========================================
@@ -764,6 +784,12 @@ function setupChart3LongClickListeners() {
 }
 
 function renderOverviewCharts(apiData) {
+    // Check if the expected data arrays exist before trying to map them
+    if (!apiData || !apiData.membership_chart || apiData.membership_chart.length === 0) {
+        console.warn("Data not ready or empty. Skipping chart render.");
+        return; // Prevents the crash that leads to white boxes
+    }
+
     // Cleanup old instances to prevent "ghost" charts
     if (chart1Instance) chart1Instance.destroy();
     if (chart2Instance) chart2Instance.destroy();
@@ -844,6 +870,11 @@ function renderOverviewCharts(apiData) {
 }
 
 function renderSiteCharts(apiData, siteKey) {
+    if (!apiData || Object.keys(apiData).length === 0) {
+        console.error("No data received from API");
+        return; // Don't crash Chart.js if the API is momentarily empty
+    }
+    
     if (chart1Instance) chart1Instance.destroy();
     if (chart2Instance) chart2Instance.destroy();
     if (chart3Instance) chart3Instance.destroy();
@@ -864,33 +895,33 @@ function renderSiteCharts(apiData, siteKey) {
         }
     });
 
-    // Vertical line plugin for site charts
+
+    // --- Updated Vertical Line Plugin for Site Charts ---
     const createVerticalLinePlugin = (chartKey) => ({
         id: `verticalLinePlugin_${chartKey}`,
         afterDatasetsDraw: (chart) => {
-            // Draw line when either the chart is active OR there's a synced line from another chart
-            const shouldDrawLine = (siteChartLongClickActive[chartKey] && siteChartActiveIndex[chartKey] !== -1) || 
-                                   (syncedLineIndex !== -1 && !siteChartLongClickActive[chartKey]);
-            
-            if (shouldDrawLine) {
+            // Check if a line should be drawn based on the shared index
+            if (syncedLineIndex !== -1) {
                 const ctx = chart.ctx;
                 const xAxis = chart.scales.x;
                 const yAxis = chart.scales.y;
                 
-                // Use exact index position for perfect alignment across charts
-                const indexToDraw = syncedLineIndex !== -1 ? syncedLineIndex : siteChartActiveIndex[chartKey];
-                if (indexToDraw === -1) return;
-                const x = xAxis.getPixelForValue(indexToDraw);
+                // MATH FIX: Get the exact pixel for the data point index
+                const x = xAxis.getPixelForValue(syncedLineIndex);
                 
-                ctx.save();
-                ctx.beginPath();
-                ctx.moveTo(x, yAxis.top);
-                ctx.lineTo(x, yAxis.bottom);
-                ctx.lineWidth = 2;
-                ctx.strokeStyle = `rgba(0, 102, 102, ${0.6 * syncedLineOpacity})`; // Apply opacity
-                ctx.setLineDash([5, 5]);
-                ctx.stroke();
-                ctx.restore();
+                // Safety check to ensure the x coordinate is within chart boundaries
+                if (x >= xAxis.left && x <= xAxis.right) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.moveTo(x, yAxis.top);
+                    ctx.lineTo(x, yAxis.bottom);
+                    ctx.lineWidth = 2;
+                    // Use the opacity variable to allow for the fade-out effect
+                    ctx.strokeStyle = `rgba(0, 102, 102, ${0.6 * syncedLineOpacity})`; 
+                    ctx.setLineDash([5, 5]); // Keeps it a dashed reference line
+                    ctx.stroke();
+                    ctx.restore();
+                }
             }
         }
     });
@@ -1116,26 +1147,19 @@ function buildActiveElementsForChart(chart, sharedIndex) {
     return [{ datasetIndex: 0, index: clampedIndex }];
 }
 
-// Helper functions for managing all 3 site charts
-function setActiveElementsOnAllCharts(activeElements) {
-    if (chart1Instance) {
-        const elems = buildActiveElementsForChart(chart1Instance, activeElements[0].index);
-        chart1Instance.setActiveElements(elems);
-        chart1Instance.tooltip.options.enabled = true;
-        chart1Instance.tooltip.setActiveElements(elems);
-    }
-    if (chart2Instance) {
-        const elems = buildActiveElementsForChart(chart2Instance, activeElements[0].index);
-        chart2Instance.setActiveElements(elems);
-        chart2Instance.tooltip.options.enabled = true;
-        chart2Instance.tooltip.setActiveElements(elems);
-    }
-    if (chart3Instance) {
-        const elems = buildActiveElementsForChart(chart3Instance, activeElements[0].index);
-        chart3Instance.setActiveElements(elems);
-        chart3Instance.tooltip.options.enabled = true;
-        chart3Instance.tooltip.setActiveElements(elems);
-    }
+// --- 2. CLAMPED INDEX SYNC (Prevents crashes during data updates) ---
+function setActiveElementsOnAllCharts(sharedIndex) {
+    [chart1Instance, chart2Instance, chart3Instance].forEach(chart => {
+        if (chart && chart.data.datasets.length > 0) {
+            // Clamp index to ensure we don't request a point that doesn't exist yet
+            const maxIdx = chart.data.datasets[0].data.length - 1;
+            const safeIdx = Math.min(Math.max(sharedIndex, 0), maxIdx);
+            
+            const activeElems = [{ datasetIndex: 0, index: safeIdx }];
+            chart.setActiveElements(activeElems);
+            chart.tooltip.setActiveElements(activeElems);
+        }
+    });
 }
 
 function updateAllCharts(mode = '') {
@@ -1239,206 +1263,56 @@ function startLinesFadeOut() {
     }, stepDuration);
 }
 
-// Setup long-press event listeners for site charts
+// --- 3. REFACTORED LONG PRESS LOGIC ---
 function setupSiteChartLongPress(chartKey, chartInstance) {
-    const canvasId = chartKey;
-    const canvas = document.getElementById(canvasId);
+    const canvas = document.getElementById(chartKey);
     if (!canvas) return;
-    
-    let previousActiveIndex = null;
-    
+
     canvas.addEventListener('mousedown', (e) => {
         if (e.button !== 0) return;
         
-        // Clear any fade-out animation when starting a new press
-        if (fadeOutInterval) {
-            clearInterval(fadeOutInterval);
-            fadeOutInterval = null;
-        }
+        if (fadeOutInterval) clearInterval(fadeOutInterval);
         syncedLineOpacity = 1;
-        
+
         siteChartLongClickTimer[chartKey] = setTimeout(() => {
             siteChartLongClickActive[chartKey] = true;
             canvas.style.cursor = 'crosshair';
-            setSiteChartsPressMode(true); // disable events + force index mode
+            setSiteChartsPressMode(true); // Locks the UI
             
             const points = chartInstance.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
-            
             if (points.length) {
-                siteChartActiveIndex[chartKey] = points[0].index;
-                syncedLineIndex = points[0].index; // Sync across all charts
-                previousActiveIndex = syncedLineIndex;
-                
-                const activeElements = [{ datasetIndex: 0, index: syncedLineIndex }];
-                setActiveElementsOnAllCharts(activeElements);
+                syncedLineIndex = points[0].index;
+                setActiveElementsOnAllCharts(syncedLineIndex);
                 updateAllCharts('none');
             }
         }, 500);
     });
-    
+
     canvas.addEventListener('mousemove', (e) => {
         if (siteChartLongClickActive[chartKey]) {
             const points = chartInstance.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
-            
-            if (points.length > 0) {
-                const newActiveIndex = points[0].index;
-                
-                if (newActiveIndex !== previousActiveIndex) {
-                    // Index changed - update all charts with new data
-                    siteChartActiveIndex[chartKey] = newActiveIndex;
-                    syncedLineIndex = newActiveIndex; // Sync across all charts
-                    previousActiveIndex = newActiveIndex;
-                    
-                    const activeElements = [{ datasetIndex: 0, index: syncedLineIndex }];
-                    setActiveElementsOnAllCharts(activeElements);
-                    updateAllCharts('none');
-                } else {
-                    // Index same - just update tooltip position for smooth cursor tracking
-                    updateTooltipPositionsOnAllCharts();
-                }
-            } else {
-                // No point under cursor: keep showing current info while pressed
-                updateTooltipPositionsOnAllCharts();
-            }
-        }
-    });
-    
-    canvas.addEventListener('mouseup', () => {
-        clearTimeout(siteChartLongClickTimer[chartKey]);
-        
-        if (siteChartLongClickActive[chartKey]) {
-            siteChartActiveIndex[chartKey] = -1;
-            siteChartLongClickActive[chartKey] = false;
-            canvas.style.cursor = 'default';
-            
-            // Reset interaction mode and events back to defaults
-            setSiteChartsPressMode(false);
-            
-            // Clear tooltips on ALL 3 charts
-            clearAllChartsActiveElements();
-
-            // Start fade-out animation for the line
-            startLinesFadeOut();
-        }
-    });
-    
-    canvas.addEventListener('mouseleave', () => {
-        clearTimeout(siteChartLongClickTimer[chartKey]);
-        if (siteChartLongClickActive[chartKey]) {
-            siteChartActiveIndex[chartKey] = -1;
-            siteChartLongClickActive[chartKey] = false;
-            canvas.style.cursor = 'default';
-            
-            // Reset interaction mode and events back to defaults
-            setSiteChartsPressMode(false);
-            
-            // Clear tooltips on ALL 3 charts
-            clearAllChartsActiveElements();
-            
-            // Start fade-out animation for the line
-            startLinesFadeOut();
-        }
-    });
-    
-    // Touch support
-    canvas.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        const touch = e.touches[0];
-        
-        // Clear any fade-out animation when starting a new press
-        if (fadeOutInterval) {
-            clearInterval(fadeOutInterval);
-            fadeOutInterval = null;
-        }
-            syncedLineOpacity = 1;
-        
-        siteChartLongClickTimer[chartKey] = setTimeout(() => {
-            siteChartLongClickActive[chartKey] = true;
-            
-            // Disable hover events and force index mode during long press
-            setSiteChartsPressMode(true);
-            
-            const rect = canvas.getBoundingClientRect();
-            const x = touch.clientX - rect.left;
-            const y = touch.clientY - rect.top;
-            
-            const points = chartInstance.getElementsAtEventForMode(
-                { x, y, native: e },
-                'index',
-                { intersect: false },
-                true
-            );
-            
-            if (points.length) {
-                siteChartActiveIndex[chartKey] = points[0].index;
-                syncedLineIndex = points[0].index; // Sync across all charts
-                previousActiveIndex = syncedLineIndex;
-                // Normalized position not needed when syncing by index
-                
-                const activeElements = [{ datasetIndex: 0, index: syncedLineIndex }];
-                setActiveElementsOnAllCharts(activeElements);
+            if (points.length > 0 && points[0].index !== syncedLineIndex) {
+                syncedLineIndex = points[0].index;
+                setActiveElementsOnAllCharts(syncedLineIndex);
                 updateAllCharts('none');
             }
-        }, 500);
-    });
-    
-    canvas.addEventListener('touchmove', (e) => {
-        if (siteChartLongClickActive[chartKey]) {
-            e.preventDefault();
-            const rect = canvas.getBoundingClientRect();
-            const touch = e.touches[0];
-            const x = touch.clientX - rect.left;
-            const y = touch.clientY - rect.top;
-            
-            const points = chartInstance.getElementsAtEventForMode(
-                { x, y, native: e },
-                'index',
-                { intersect: false },
-                true
-            );
-            
-            if (points.length) {
-                const newActiveIndex = points[0].index;
-                
-                if (newActiveIndex !== previousActiveIndex) {
-                    // Index changed - update all charts with new data
-                    siteChartActiveIndex[chartKey] = newActiveIndex;
-                    syncedLineIndex = newActiveIndex; // Sync across all charts
-                    previousActiveIndex = newActiveIndex;
-                    // Syncing purely by index
-                    
-                    const activeElements = [{ datasetIndex: 0, index: syncedLineIndex }];
-                    setActiveElementsOnAllCharts(activeElements);
-                    updateAllCharts('none');
-                } else {
-                    // Index same - just update tooltip position for smooth cursor tracking
-                    updateTooltipPositionsOnAllCharts();
-                }
-            } else {
-                // No point under finger: keep showing current info while pressed
-                updateTooltipPositionsOnAllCharts();
-            }
-        } else {
-            clearTimeout(siteChartLongClickTimer[chartKey]);
         }
     });
-    
-    canvas.addEventListener('touchend', () => {
+
+    // Unified cleanup for mouseup and mouseleave
+    const endPress = () => {
         clearTimeout(siteChartLongClickTimer[chartKey]);
         if (siteChartLongClickActive[chartKey]) {
-            siteChartActiveIndex[chartKey] = -1;
             siteChartLongClickActive[chartKey] = false;
-            
-            // Reset interaction mode and events back to defaults
-            setSiteChartsPressMode(false);
-            
-            // Clear tooltips on ALL 3 charts
+            canvas.style.cursor = 'default';
+            setSiteChartsPressMode(false); // Restores hover
             clearAllChartsActiveElements();
-            
-            // Start fade-out animation for the line
             startLinesFadeOut();
         }
-    });
+    };
+
+    canvas.addEventListener('mouseup', endPress);
+    canvas.addEventListener('mouseleave', endPress);
 }
 
 // ==========================================
@@ -1474,24 +1348,18 @@ function showOverview() {
     fetchAndRender();
 }
 
-// Toggle long-press mode on all site charts: disable default hover events and force index mode
+// --- 1. REFACTORED PRESS MODE (Critical for Real-time) ---
 function setSiteChartsPressMode(active) {
     const interactionMode = active ? 'index' : 'point';
     const intersect = !active;
+    // Muting events prevents the chart from flickering if real-time data arrives during a press
     const eventsValue = active ? [] : chartDefaultEvents;
-    if (chart1Instance) {
-        chart1Instance.options.interaction.mode = interactionMode;
-        chart1Instance.options.interaction.intersect = intersect;
-        chart1Instance.options.events = eventsValue;
-    }
-    if (chart2Instance) {
-        chart2Instance.options.interaction.mode = interactionMode;
-        chart2Instance.options.interaction.intersect = intersect;
-        chart2Instance.options.events = eventsValue;
-    }
-    if (chart3Instance) {
-        chart3Instance.options.interaction.mode = interactionMode;
-        chart3Instance.options.interaction.intersect = intersect;
-        chart3Instance.options.events = eventsValue;
-    }
+
+    [chart1Instance, chart2Instance, chart3Instance].forEach(chart => {
+        if (chart) {
+            chart.options.interaction.mode = interactionMode;
+            chart.options.interaction.intersect = intersect;
+            chart.options.events = eventsValue;
+        }
+    });
 }
