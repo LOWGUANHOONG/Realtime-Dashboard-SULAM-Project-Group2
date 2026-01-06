@@ -16,17 +16,30 @@ const siteIdMap = {
 // Global variables for date selection
 let selectedYear = null;
 let selectedMonth = null;
-let latestAvailableYear = 2025;
-let latestAvailableMonth = 12;
+let latestAvailableYear = 0;
+let latestAvailableMonth = 0;
 let isDateSelectorOpen = false;
 let isInitialLoad = true; // Flag to track first page load
 let currentDemoFilter = 'age'; // Track current demographic filter
+let currentSiteKey = null; // Track which site page is currently being viewed
 const availableYears = [2021, 2022, 2023, 2024, 2025];
 const monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 let chart3ActiveDataIndex = -1;
 let chart3AllData = [];
 let chart3IsLongClickActive = false;
 let chart3LongClickTimer = null;
+
+// Site chart long-press tracking
+let siteChartActiveIndex = { chart1: -1, chart2: -1, chart3: -1 };
+let siteChartLongClickActive = { chart1: false, chart2: false, chart3: false };
+let siteChartLongClickTimer = { chart1: null, chart2: null, chart3: null };
+let siteChartData = { chart1: [], chart2: [], chart3: [] };
+
+// Global synchronized line state for site charts
+let syncedLineIndex = -1; // Shared index across all 3 charts
+let syncedLineT = null; // Normalized x-position (0-1) for smoother cross-chart line
+let syncedLineOpacity = 1; // For fade-out effect
+let fadeOutInterval = null; // Animation interval
 
 document.addEventListener("DOMContentLoaded", function () {
     // Ensure the BWM box is active on initial load
@@ -36,6 +49,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     
     // Initial load: BWM Overview
+    currentSiteKey = null; // Start in overview mode
     fetchAndRender();
     isInitialLoad = false; // Mark initial load complete after first fetch
 
@@ -59,9 +73,9 @@ async function fetchAndRender(siteKey = null, demoFilter = null) {
     const siteId = siteKey ? siteIdMap[siteKey] : null;
 
     if (siteId) url += `&site_id=${siteId}`;
-    
-    // Include selected year and month for overview (to persist date selection after initial load)
-    if (!siteId && selectedYear && selectedMonth) {
+
+    // Always pass the selected period so backend can align responses for overview and site views
+    if (selectedYear && selectedMonth) {
         url += `&year=${selectedYear}&month=${selectedMonth}`;
     }
 
@@ -96,7 +110,13 @@ async function updateDemographicChartOnly(demoFilter) {
     currentDemoFilter = demoFilter;
     
     try {
-        const response = await fetch(`/api/data?demo_filter=${demoFilter}`);
+        const params = new URLSearchParams({ demo_filter: demoFilter });
+        if (selectedYear && selectedMonth) {
+            params.append('year', selectedYear);
+            params.append('month', selectedMonth);
+        }
+
+        const response = await fetch(`/api/data?${params.toString()}`);
         const result = await response.json();
 
         if (result.status === "success") {
@@ -171,43 +191,41 @@ function updateKPICards(kpis, view) {
 }
 
 function updateDataPeriod(apiData, siteKey) {
-    let latestMonth = '';
-    let latestYear = '';
-    let latestMonthNum = 0;
+    // Extract the true database maximum (this is the upper limit for date selection)
+    let dbMaxYear = apiData.latest_year || null;
+    let dbMaxMonth = apiData.latest_month || null;
 
-    // Extract latest month and year from the appropriate data source
-    if (siteKey) {
-        // For site view, get from charts data
-        if (apiData.charts && apiData.charts.length > 0) {
-            const lastChart = apiData.charts[apiData.charts.length - 1];
-            latestMonth = lastChart.month_name;
-            latestYear = lastChart.year;
-            latestMonthNum = lastChart.month_num;
-        }
-    } else {
-        // For overview, get from master_graph data
-        if (apiData.master_graph && apiData.master_graph.length > 0) {
+    // Fall back to the dataset if the API did not provide explicit latest values
+    if (!dbMaxYear || !dbMaxMonth) {
+        if (siteKey) {
+            if (apiData.charts && apiData.charts.length > 0) {
+                const lastChart = apiData.charts[apiData.charts.length - 1];
+                dbMaxYear = dbMaxYear || lastChart.year;
+                dbMaxMonth = dbMaxMonth || lastChart.month_num;
+            }
+        } else if (apiData.master_graph && apiData.master_graph.length > 0) {
             const lastData = apiData.master_graph[apiData.master_graph.length - 1];
-            latestMonth = lastData.month_name;
-            latestYear = lastData.year;
-            latestMonthNum = lastData.month_num;
+            dbMaxYear = dbMaxYear || lastData.year;
+            dbMaxMonth = dbMaxMonth || lastData.month_num;
         }
     }
 
-    // Store latest available date
-    if (latestYear && latestMonthNum) {
-        latestAvailableYear = latestYear;
-        latestAvailableMonth = latestMonthNum;
-        // If selectedYear/selectedMonth are not set yet (null), set them from database max
-        if (!selectedYear || !selectedMonth) {
-            selectedYear = latestYear;
-            selectedMonth = latestMonthNum;
-        }
+    // ONLY update the global max if we got a valid value (this should stay constant)
+    if (dbMaxYear && dbMaxMonth && (latestAvailableYear === 0 || latestAvailableMonth === 0)) {
+        latestAvailableYear = dbMaxYear;
+        latestAvailableMonth = dbMaxMonth;
     }
+
+    if (!selectedYear || !selectedMonth) {
+        selectedYear = latestAvailableYear;
+        selectedMonth = latestAvailableMonth;
+    }
+
+    if (!selectedYear || !selectedMonth) return;
 
     // Update the header with the latest period
     const dataPeriodElement = document.getElementById('dataPeriod');
-    if (dataPeriodElement && latestMonth && latestYear) {
+    if (dataPeriodElement && selectedMonth && selectedYear) {
         // Always render with arrows (hidden by default)
         const currentMonthName = monthNames[selectedMonth - 1];
         const selectorHTML = `
@@ -227,12 +245,14 @@ function updateDataPeriod(apiData, siteKey) {
         `;
         dataPeriodElement.innerHTML = selectorHTML;
         
-        // Make it interactive for overview
-        if (!siteKey) {
-            dataPeriodElement.style.cursor = 'pointer';
-            dataPeriodElement.addEventListener('mouseenter', showArrows);
-            dataPeriodElement.addEventListener('mouseleave', hideArrows);
-        }
+        // Make it interactive for all pages (overview and site views)
+        dataPeriodElement.style.cursor = 'pointer';
+        // Remove old event listeners to prevent duplicates
+        dataPeriodElement.removeEventListener('mouseenter', showArrows);
+        dataPeriodElement.removeEventListener('mouseleave', hideArrows);
+        // Add new event listeners
+        dataPeriodElement.addEventListener('mouseenter', showArrows);
+        dataPeriodElement.addEventListener('mouseleave', hideArrows);
     }
 }
 
@@ -327,88 +347,36 @@ function updateDateSelectorDisplay() {
 // Fetch data for selected date
 async function fetchDataForSelectedDate() {
     try {
-        // Use the stored current demographic filter
-        const response = await fetch(`/api/data?year=${selectedYear}&month=${selectedMonth}&demo_filter=${currentDemoFilter}`);
+        if (!selectedYear || !selectedMonth) {
+            selectedYear = latestAvailableYear;
+            selectedMonth = latestAvailableMonth;
+        }
+        if (!selectedYear || !selectedMonth) return;
+
+        // Build URL based on current view (site or overview)
+        let url = `/api/data?year=${selectedYear}&month=${selectedMonth}&demo_filter=${currentDemoFilter}`;
+        if (currentSiteKey) {
+            const siteId = siteIdMap[currentSiteKey];
+            url += `&site_id=${siteId}`;
+        }
+        
+        const response = await fetch(url);
         const result = await response.json();
         
         if (result.status === "success") {
             const apiData = result.data;
             
-            // Update KPI cards
-            updateKPICards(apiData.kpis, 'overview');
+            // Update KPI cards with appropriate view type
+            updateKPICards(apiData.kpis, currentSiteKey ? 'site' : 'overview');
             
-            // Update Chart 1: Membership chart filtered by latest available month/year
-            // Backend now handles filtering and aggregation
-            if (chart1Instance) chart1Instance.destroy();
-            const ctx1 = document.getElementById('chart1');
-            
-            const years = apiData.membership_chart.map(item => item.year);
-            const generalMembersData = apiData.membership_chart.map(item => item.avg_members || 0);
-            const councilMembersData = apiData.membership_chart.map(item => item.avg_council || 0);
-            
-            chart1Instance = new Chart(ctx1, {
-                type: 'bar',
-                data: {
-                    labels: years,
-                    datasets: [
-                        { 
-                            label: 'General Members', 
-                            data: generalMembersData, 
-                            backgroundColor: '#68d3d8' 
-                        },
-                        { 
-                            label: 'Council Members', 
-                            data: councilMembersData, 
-                            backgroundColor: '#4a6fa5' 
-                        }
-                    ]
-                },
-                options: {
-                    indexAxis: 'y',
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: { x: { stacked: true }, y: { stacked: true } },
-                    plugins: { title: { display: true, text: 'AVERAGE ANNUAL MEMBERSHIP COMPOSITION' } }
-                }
-            });
-            
-            // Update demographics chart (chart 2)
-            if (chart2Instance) chart2Instance.destroy();
-            const ctx2 = document.getElementById('chart2');
-            chart2Instance = new Chart(ctx2, {
-                type: 'doughnut',
-                data: {
-                    labels: apiData.demographics.map(d => d.label),
-                    datasets: [{
-                        data: apiData.demographics.map(d => d.value),
-                        backgroundColor: ['#366d75', '#68d3d8', '#4a6fa5', '#f4d35e', '#ee964b'],
-                        borderWidth: 2,
-                        hoverOffset: 10
-                    }]
-                },
-                options: { 
-                    responsive: true, 
-                    maintainAspectRatio: false,
-                    layout: {
-                        padding: { left: 110, right: 100 , top: 0, bottom: 0 }
-                    },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'right',
-                            align: 'center',
-                            labels: {
-                                boxWidth: 12,
-                                padding: 12,
-                                font: { size: 12 }
-                            }
-                        }
-                    }
-                }
-            });
-            
-            // Update master graph (chart 3) with data from JAN 2021 to selected date
-            updateMasterGraphWithDateFilter(apiData.master_graph);
+            // Update based on current view
+            if (currentSiteKey) {
+                // Update site charts
+                renderSiteCharts(apiData, currentSiteKey);
+            } else {
+                // Update all overview charts (membership, demographics, and master graph)
+                renderOverviewCharts(apiData);
+            }
         }
     } catch (error) {
         console.error("Error fetching data for selected date:", error);
@@ -876,13 +844,54 @@ function renderSiteCharts(apiData, siteKey) {
     if (chart2Instance) chart2Instance.destroy();
     if (chart3Instance) chart3Instance.destroy();
 
-    // Show each year only once
+    // Store chart data for long-press tooltips
+    siteChartData.chart1 = apiData.charts;
+    siteChartData.chart2 = apiData.charts;
+    siteChartData.chart3 = apiData.charts;
+
+    // Create labels showing year for January, empty string for other months
     const labels = [];
-    let lastYear = null;
     apiData.charts.forEach(m => {
-        if (m.year !== lastYear) {
+        // Show year only at the start of each year (January)
+        if (m.month_name === 'JAN' || labels.length === 0) {
             labels.push(m.year);
-            lastYear = m.year;
+        } else {
+            labels.push('');
+        }
+    });
+
+    // Vertical line plugin for site charts
+    const createVerticalLinePlugin = (chartKey) => ({
+        id: `verticalLinePlugin_${chartKey}`,
+        afterDatasetsDraw: (chart) => {
+            // Draw line when either the chart is active OR there's a synced line from another chart
+            const shouldDrawLine = (siteChartLongClickActive[chartKey] && siteChartActiveIndex[chartKey] !== -1) || 
+                                   (syncedLineIndex !== -1 && !siteChartLongClickActive[chartKey]);
+            
+            if (shouldDrawLine) {
+                const ctx = chart.ctx;
+                const xAxis = chart.scales.x;
+                const yAxis = chart.scales.y;
+                
+                // Use exact index position when we have one; fall back to normalized position if only cursor T is known
+                let x;
+                const indexToDraw = syncedLineIndex !== -1 ? syncedLineIndex : siteChartActiveIndex[chartKey];
+                if (indexToDraw !== -1) {
+                    x = xAxis.getPixelForValue(indexToDraw);
+                } else if (syncedLineT !== null) {
+                    x = xAxis.left + syncedLineT * (xAxis.right - xAxis.left);
+                }
+                
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(x, yAxis.top);
+                ctx.lineTo(x, yAxis.bottom);
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = `rgba(0, 102, 102, ${0.6 * syncedLineOpacity})`; // Apply opacity
+                ctx.setLineDash([5, 5]);
+                ctx.stroke();
+                ctx.restore();
+            }
         }
     });
 
@@ -891,9 +900,67 @@ function renderSiteCharts(apiData, siteKey) {
         type: 'line',
         data: {
             labels: labels,
-            datasets: [{ label: 'Donations', data: apiData.charts.map(d => d.donations), borderColor: '#366d75' }]
+            datasets: [{ 
+                label: 'Donations', 
+                data: apiData.charts.map(d => d.donations), 
+                borderColor: '#366d75',
+                tension: 0.3,
+                fill: false,
+                pointRadius: 2,
+                pointHoverRadius: 4
+            }]
         },
-        options: { responsive: true, maintainAspectRatio: false }
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'point',
+                intersect: true
+            },
+            plugins: {
+                title: { display: true, text: 'DONATIONS OVER TIME' },
+                tooltip: {
+                    enabled: true,
+                    mode: 'point',
+                    intersect: true,
+                    backgroundColor: 'rgba(0, 51, 77, 0.9)',
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    borderColor: '#006666',
+                    borderWidth: 2,
+                    padding: 12,
+                    displayColors: false,
+                    callbacks: {
+                        title: (tooltipItems) => {
+                            if (tooltipItems.length > 0) {
+                                const dataIndex = tooltipItems[0].dataIndex;
+                                // Try to get data from siteChartData first
+                                if (siteChartData.chart1 && siteChartData.chart1[dataIndex]) {
+                                    const data = siteChartData.chart1[dataIndex];
+                                    return `${data.month_name || 'N/A'} ${data.year || ''}`;
+                                }
+                                // Fallback to chart label if siteChartData is missing
+                                if (chart1Instance && chart1Instance.data && chart1Instance.data.labels && chart1Instance.data.labels[dataIndex]) {
+                                    return chart1Instance.data.labels[dataIndex];
+                                }
+                            }
+                            return 'Date';
+                        },
+                        label: (context) => {
+                            const value = context.parsed.y;
+                            if (value !== null && value !== undefined) {
+                                return `Donations: ${value}`;
+                            }
+                            return 'Donations: N/A';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        },
+        plugins: [createVerticalLinePlugin('chart1')]
     });
 
     // Chart 2: Volunteers
@@ -901,9 +968,67 @@ function renderSiteCharts(apiData, siteKey) {
         type: 'line',
         data: {
             labels: labels,
-            datasets: [{ label: 'Volunteers', data: apiData.charts.map(v => v.volunteers), borderColor: '#68d3d8' }]
+            datasets: [{ 
+                label: 'Volunteers', 
+                data: apiData.charts.map(v => v.volunteers), 
+                borderColor: '#68d3d8',
+                tension: 0.3,
+                fill: false,
+                pointRadius: 2,
+                pointHoverRadius: 4
+            }]
         },
-        options: { responsive: true, maintainAspectRatio: false }
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'point',
+                intersect: true
+            },
+            plugins: {
+                title: { display: true, text: 'VOLUNTEERS OVER TIME' },
+                tooltip: {
+                    enabled: true,
+                    mode: 'point',
+                    intersect: true,
+                    backgroundColor: 'rgba(0, 51, 77, 0.9)',
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    borderColor: '#006666',
+                    borderWidth: 2,
+                    padding: 12,
+                    displayColors: false,
+                    callbacks: {
+                        title: (tooltipItems) => {
+                            if (tooltipItems.length > 0) {
+                                const dataIndex = tooltipItems[0].dataIndex;
+                                // Try to get data from siteChartData first
+                                if (siteChartData.chart2 && siteChartData.chart2[dataIndex]) {
+                                    const data = siteChartData.chart2[dataIndex];
+                                    return `${data.month_name || 'N/A'} ${data.year || ''}`;
+                                }
+                                // Fallback to chart label if siteChartData is missing
+                                if (chart2Instance && chart2Instance.data && chart2Instance.data.labels && chart2Instance.data.labels[dataIndex]) {
+                                    return chart2Instance.data.labels[dataIndex];
+                                }
+                            }
+                            return 'Date';
+                        },
+                        label: (context) => {
+                            const value = context.parsed.y;
+                            if (value !== null && value !== undefined) {
+                                return `Volunteers: ${value}`;
+                            }
+                            return 'Volunteers: N/A';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        },
+        plugins: [createVerticalLinePlugin('chart2')]
     });
 
     // Chart 3: Sponsorships
@@ -911,9 +1036,490 @@ function renderSiteCharts(apiData, siteKey) {
         type: 'line',
         data: {
             labels: labels,
-            datasets: [{ label: 'Sponsorships', data: apiData.charts.map(s => s.sponsorships), borderColor: '#4a6fa5' }]
+            datasets: [{ 
+                label: 'Sponsorships', 
+                data: apiData.charts.map(s => s.sponsorships), 
+                borderColor: '#4a6fa5',
+                tension: 0.3,
+                fill: false,
+                pointRadius: 2,
+                pointHoverRadius: 4
+            }]
         },
-        options: { responsive: true, maintainAspectRatio: false }
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'point',
+                intersect: true
+            },
+            plugins: {
+                title: { display: true, text: 'SPONSORSHIPS OVER TIME' },
+                tooltip: {
+                    enabled: true,
+                    mode: 'point',
+                    intersect: true,
+                    backgroundColor: 'rgba(0, 51, 77, 0.9)',
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    borderColor: '#006666',
+                    borderWidth: 2,
+                    padding: 12,
+                    displayColors: false,
+                    callbacks: {
+                        title: (tooltipItems) => {
+                            if (tooltipItems.length > 0) {
+                                const dataIndex = tooltipItems[0].dataIndex;
+                                // Try to get data from siteChartData first
+                                if (siteChartData.chart3 && siteChartData.chart3[dataIndex]) {
+                                    const data = siteChartData.chart3[dataIndex];
+                                    return `${data.month_name || 'N/A'} ${data.year || ''}`;
+                                }
+                                // Fallback to chart label if siteChartData is missing
+                                if (chart3Instance && chart3Instance.data && chart3Instance.data.labels && chart3Instance.data.labels[dataIndex]) {
+                                    return chart3Instance.data.labels[dataIndex];
+                                }
+                            }
+                            return 'Date';
+                        },
+                        label: (context) => {
+                            const value = context.parsed.y;
+                            if (value !== null && value !== undefined) {
+                                return `Sponsorships: ${value}`;
+                            }
+                            return 'Sponsorships: N/A';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        },
+        plugins: [createVerticalLinePlugin('chart3')]
+    });
+
+    // Setup long-press listeners for all site charts
+    setupSiteChartLongPress('chart1', chart1Instance);
+    setupSiteChartLongPress('chart2', chart2Instance);
+    setupSiteChartLongPress('chart3', chart3Instance);
+}
+
+// Helper functions for managing all 3 site charts
+function setActiveElementsOnAllCharts(activeElements) {
+    if (chart1Instance) {
+        chart1Instance.setActiveElements(activeElements);
+        chart1Instance.tooltip.options.enabled = true;
+        chart1Instance.tooltip.setActiveElements(activeElements);
+    }
+    if (chart2Instance) {
+        chart2Instance.setActiveElements(activeElements);
+        chart2Instance.tooltip.options.enabled = true;
+        chart2Instance.tooltip.setActiveElements(activeElements);
+    }
+    if (chart3Instance) {
+        chart3Instance.setActiveElements(activeElements);
+        chart3Instance.tooltip.options.enabled = true;
+        chart3Instance.tooltip.setActiveElements(activeElements);
+    }
+}
+
+function updateAllCharts(mode = '') {
+    if (chart1Instance) {
+        chart1Instance.update(mode || undefined);
+        // Always show tooltip if there are active elements
+        if (chart1Instance.getActiveElements && chart1Instance.getActiveElements().length > 0) {
+            chart1Instance.tooltip.setActiveElements(chart1Instance.getActiveElements());
+            chart1Instance.draw();
+        }
+    }
+    if (chart2Instance) {
+        chart2Instance.update(mode || undefined);
+        // Always show tooltip if there are active elements
+        if (chart2Instance.getActiveElements && chart2Instance.getActiveElements().length > 0) {
+            chart2Instance.tooltip.setActiveElements(chart2Instance.getActiveElements());
+            chart2Instance.draw();
+        }
+    }
+    if (chart3Instance) {
+        chart3Instance.update(mode || undefined);
+        // Always show tooltip if there are active elements
+        if (chart3Instance.getActiveElements && chart3Instance.getActiveElements().length > 0) {
+            chart3Instance.tooltip.setActiveElements(chart3Instance.getActiveElements());
+            chart3Instance.draw();
+        }
+    }
+}
+
+// Helper to update tooltip positions on all charts without redrawing (smooth cursor tracking)
+function updateTooltipPositionsOnAllCharts() {
+    if (chart1Instance && chart1Instance.getActiveElements && chart1Instance.getActiveElements().length > 0) {
+        const activeElements = chart1Instance.getActiveElements();
+        chart1Instance.tooltip.setActiveElements(activeElements);
+        chart1Instance.draw();
+    }
+    if (chart2Instance && chart2Instance.getActiveElements && chart2Instance.getActiveElements().length > 0) {
+        const activeElements = chart2Instance.getActiveElements();
+        chart2Instance.tooltip.setActiveElements(activeElements);
+        chart2Instance.draw();
+    }
+    if (chart3Instance && chart3Instance.getActiveElements && chart3Instance.getActiveElements().length > 0) {
+        const activeElements = chart3Instance.getActiveElements();
+        chart3Instance.tooltip.setActiveElements(activeElements);
+        chart3Instance.draw();
+    }
+}
+
+function clearAllChartsActiveElements() {
+    if (chart1Instance) {
+        chart1Instance.setActiveElements([]);
+        chart1Instance.tooltip.setActiveElements([], { x: 0, y: 0 });
+        chart1Instance.draw();
+    }
+    if (chart2Instance) {
+        chart2Instance.setActiveElements([]);
+        chart2Instance.tooltip.setActiveElements([], { x: 0, y: 0 });
+        chart2Instance.draw();
+    }
+    if (chart3Instance) {
+        chart3Instance.setActiveElements([]);
+        chart3Instance.tooltip.setActiveElements([], { x: 0, y: 0 });
+        chart3Instance.draw();
+    }
+}
+
+// Helper function to start fade-out animation
+function startLinesFadeOut() {
+    // Clear any existing fade-out animation
+    if (fadeOutInterval) clearInterval(fadeOutInterval);
+    
+    syncedLineOpacity = 1;
+    const fadeOutDuration = 300; // milliseconds
+    const steps = 30;
+    const stepDuration = fadeOutDuration / steps;
+    let currentStep = 0;
+    
+    fadeOutInterval = setInterval(() => {
+        currentStep++;
+        syncedLineOpacity = 1 - (currentStep / steps);
+        
+        // Update all 3 charts
+        if (chart1Instance) chart1Instance.update();
+        if (chart2Instance) chart2Instance.update();
+        if (chart3Instance) chart3Instance.update();
+        
+        if (currentStep >= steps) {
+            clearInterval(fadeOutInterval);
+            fadeOutInterval = null;
+            syncedLineIndex = -1;
+            syncedLineOpacity = 1;
+            syncedLineT = null;
+            
+            // Clear tooltips completely when line fades out
+            clearAllChartsActiveElements();
+            
+            // Final update to clear the line completely
+            if (chart1Instance) chart1Instance.update();
+            if (chart2Instance) chart2Instance.update();
+            if (chart3Instance) chart3Instance.update();
+        }
+    }, stepDuration);
+}
+
+// Setup long-press event listeners for site charts
+function setupSiteChartLongPress(chartKey, chartInstance) {
+    const canvasId = chartKey;
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    
+    let previousActiveIndex = null;
+    
+    canvas.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        
+        // Clear any fade-out animation when starting a new press
+        if (fadeOutInterval) {
+            clearInterval(fadeOutInterval);
+            fadeOutInterval = null;
+        }
+        syncedLineOpacity = 1;
+        
+        siteChartLongClickTimer[chartKey] = setTimeout(() => {
+            siteChartLongClickActive[chartKey] = true;
+            canvas.style.cursor = 'crosshair';
+            
+            // Change tooltip mode to index for synced tooltips across all charts
+            if (chart1Instance) {
+                chart1Instance.options.interaction.mode = 'index';
+                chart1Instance.options.interaction.intersect = false;
+            }
+            if (chart2Instance) {
+                chart2Instance.options.interaction.mode = 'index';
+                chart2Instance.options.interaction.intersect = false;
+            }
+            if (chart3Instance) {
+                chart3Instance.options.interaction.mode = 'index';
+                chart3Instance.options.interaction.intersect = false;
+            }
+            
+            const points = chartInstance.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
+            
+            if (points.length) {
+                siteChartActiveIndex[chartKey] = points[0].index;
+                syncedLineIndex = points[0].index; // Sync across all charts
+                previousActiveIndex = syncedLineIndex;
+                // Capture normalized cursor position for smooth cross-chart line
+                const scale = chartInstance.scales.x;
+                const t = (e.offsetX - scale.left) / (scale.right - scale.left);
+                syncedLineT = Math.min(1, Math.max(0, t));
+                
+                const activeElements = [{ datasetIndex: 0, index: syncedLineIndex }];
+                setActiveElementsOnAllCharts(activeElements);
+                updateAllCharts('none');
+            }
+        }, 500);
+    });
+    
+    canvas.addEventListener('mousemove', (e) => {
+        if (siteChartLongClickActive[chartKey]) {
+            // Long-press mode: keep existing synced behavior
+            const points = chartInstance.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
+            
+            if (points.length > 0) {
+                const newActiveIndex = points[0].index;
+                
+                if (newActiveIndex !== previousActiveIndex) {
+                    // Index changed - update all charts with new data
+                    siteChartActiveIndex[chartKey] = newActiveIndex;
+                    syncedLineIndex = newActiveIndex; // Sync across all charts
+                    previousActiveIndex = newActiveIndex;
+                    // Update normalized position for cross-chart smoothness
+                    const scale = chartInstance.scales.x;
+                    const t = (e.offsetX - scale.left) / (scale.right - scale.left);
+                    syncedLineT = Math.min(1, Math.max(0, t));
+                    
+                    const activeElements = [{ datasetIndex: 0, index: syncedLineIndex }];
+                    setActiveElementsOnAllCharts(activeElements);
+                    updateAllCharts('none');
+                } else {
+                    // Index same - just update tooltip position for smooth cursor tracking
+                    updateTooltipPositionsOnAllCharts();
+                }
+            }
+        } else {
+            // Hover mode: mirror the synced effect across charts using nearest point on hover
+            const points = chartInstance.getElementsAtEventForMode(e, 'nearest', { intersect: true }, true);
+            if (points.length > 0) {
+                const newActiveIndex = points[0].index;
+                if (newActiveIndex !== syncedLineIndex || siteChartActiveIndex[chartKey] !== newActiveIndex) {
+                    siteChartActiveIndex[chartKey] = newActiveIndex;
+                    syncedLineIndex = newActiveIndex;
+                    syncedLineT = null; // Use exact point location
+                    const activeElements = [{ datasetIndex: 0, index: syncedLineIndex }];
+                    setActiveElementsOnAllCharts(activeElements);
+                    updateAllCharts('none');
+                } else {
+                    updateTooltipPositionsOnAllCharts();
+                }
+            } else {
+                // No point under cursor: clear synced state softly
+                syncedLineIndex = -1;
+                syncedLineT = null;
+                clearAllChartsActiveElements();
+                updateAllCharts('none');
+            }
+        }
+    });
+    
+    canvas.addEventListener('mouseup', () => {
+        clearTimeout(siteChartLongClickTimer[chartKey]);
+        
+        if (siteChartLongClickActive[chartKey]) {
+            siteChartActiveIndex[chartKey] = -1;
+            siteChartLongClickActive[chartKey] = false;
+            canvas.style.cursor = 'default';
+            
+            // Reset interaction mode back to point
+            if (chart1Instance) {
+                chart1Instance.options.interaction.mode = 'point';
+                chart1Instance.options.interaction.intersect = true;
+            }
+            if (chart2Instance) {
+                chart2Instance.options.interaction.mode = 'point';
+                chart2Instance.options.interaction.intersect = true;
+            }
+            if (chart3Instance) {
+                chart3Instance.options.interaction.mode = 'point';
+                chart3Instance.options.interaction.intersect = true;
+            }
+            
+            // Clear tooltips on ALL 3 charts
+            clearAllChartsActiveElements();
+
+            // Start fade-out animation for the line
+            startLinesFadeOut();
+        }
+    });
+    
+    canvas.addEventListener('mouseleave', () => {
+        clearTimeout(siteChartLongClickTimer[chartKey]);
+        if (siteChartLongClickActive[chartKey]) {
+            siteChartActiveIndex[chartKey] = -1;
+            siteChartLongClickActive[chartKey] = false;
+            canvas.style.cursor = 'default';
+            
+            // Reset interaction mode back to point
+            if (chart1Instance) {
+                chart1Instance.options.interaction.mode = 'point';
+                chart1Instance.options.interaction.intersect = true;
+            }
+            if (chart2Instance) {
+                chart2Instance.options.interaction.mode = 'point';
+                chart2Instance.options.interaction.intersect = true;
+            }
+            if (chart3Instance) {
+                chart3Instance.options.interaction.mode = 'point';
+                chart3Instance.options.interaction.intersect = true;
+            }
+            
+            // Clear tooltips on ALL 3 charts
+            clearAllChartsActiveElements();
+            
+            // Start fade-out animation for the line
+            startLinesFadeOut();
+        } else {
+            // Hover-only: clear synced state on exit without fade animation
+            syncedLineIndex = -1;
+            syncedLineT = null;
+            clearAllChartsActiveElements();
+            updateAllCharts('none');
+        }
+    });
+    
+    // Touch support
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        
+        // Clear any fade-out animation when starting a new press
+        if (fadeOutInterval) {
+            clearInterval(fadeOutInterval);
+            fadeOutInterval = null;
+        }
+            syncedLineOpacity = 1;
+            syncedLineT = null;
+        
+        siteChartLongClickTimer[chartKey] = setTimeout(() => {
+            siteChartLongClickActive[chartKey] = true;
+            
+            // Change tooltip mode to index for synced tooltips across all charts
+            if (chart1Instance) {
+                chart1Instance.options.interaction.mode = 'index';
+                chart1Instance.options.interaction.intersect = false;
+            }
+            if (chart2Instance) {
+                chart2Instance.options.interaction.mode = 'index';
+                chart2Instance.options.interaction.intersect = false;
+            }
+            if (chart3Instance) {
+                chart3Instance.options.interaction.mode = 'index';
+                chart3Instance.options.interaction.intersect = false;
+            }
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            
+            const points = chartInstance.getElementsAtEventForMode(
+                { x, y, native: e },
+                'index',
+                { intersect: false },
+                true
+            );
+            
+            if (points.length) {
+                siteChartActiveIndex[chartKey] = points[0].index;
+                syncedLineIndex = points[0].index; // Sync across all charts
+                previousActiveIndex = syncedLineIndex;
+                // Capture normalized touch position for smooth cross-chart line
+                const scale = chartInstance.scales.x;
+                const t = (x - scale.left) / (scale.right - scale.left);
+                syncedLineT = Math.min(1, Math.max(0, t));
+                
+                const activeElements = [{ datasetIndex: 0, index: syncedLineIndex }];
+                setActiveElementsOnAllCharts(activeElements);
+                updateAllCharts('none');
+            }
+        }, 500);
+    });
+    
+    canvas.addEventListener('touchmove', (e) => {
+        if (siteChartLongClickActive[chartKey]) {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            
+            const points = chartInstance.getElementsAtEventForMode(
+                { x, y, native: e },
+                'index',
+                { intersect: false },
+                true
+            );
+            
+            if (points.length) {
+                const newActiveIndex = points[0].index;
+                
+                if (newActiveIndex !== previousActiveIndex) {
+                    // Index changed - update all charts with new data
+                    siteChartActiveIndex[chartKey] = newActiveIndex;
+                    syncedLineIndex = newActiveIndex; // Sync across all charts
+                    previousActiveIndex = newActiveIndex;
+                    // Update normalized position for cross-chart smoothness
+                    const scale = chartInstance.scales.x;
+                    const t = (x - scale.left) / (scale.right - scale.left);
+                    syncedLineT = Math.min(1, Math.max(0, t));
+                    
+                    const activeElements = [{ datasetIndex: 0, index: syncedLineIndex }];
+                    setActiveElementsOnAllCharts(activeElements);
+                    updateAllCharts('none');
+                } else {
+                    // Index same - just update tooltip position for smooth cursor tracking
+                    updateTooltipPositionsOnAllCharts();
+                }
+            }
+        } else {
+            clearTimeout(siteChartLongClickTimer[chartKey]);
+        }
+    });
+    
+    canvas.addEventListener('touchend', () => {
+        clearTimeout(siteChartLongClickTimer[chartKey]);
+        if (siteChartLongClickActive[chartKey]) {
+            siteChartActiveIndex[chartKey] = -1;
+            siteChartLongClickActive[chartKey] = false;
+            
+            // Reset interaction mode back to point
+            if (chart1Instance) {
+                chart1Instance.options.interaction.mode = 'point';
+                chart1Instance.options.interaction.intersect = true;
+            }
+            if (chart2Instance) {
+                chart2Instance.options.interaction.mode = 'point';
+                chart2Instance.options.interaction.intersect = true;
+            }
+            if (chart3Instance) {
+                chart3Instance.options.interaction.mode = 'point';
+                chart3Instance.options.interaction.intersect = true;
+            }
+            
+            // Clear tooltips on ALL 3 charts
+            clearAllChartsActiveElements();
+            
+            // Start fade-out animation for the line
+            startLinesFadeOut();
+        }
     });
 }
 
@@ -925,6 +1531,9 @@ function updateDashboard(siteKey) {
     // Find the box that was clicked and add active class
     const clickedBox = document.querySelector(`.site-box[onclick*="${siteKey}"]`);
     if (clickedBox) clickedBox.classList.add('active');
+    
+    // Update current site tracking
+    currentSiteKey = siteKey;
 
     fetchAndRender(siteKey);
 }
@@ -934,6 +1543,9 @@ function showOverview() {
     // Add active class to BWM box when showing overview
     const bwmBox = document.querySelector('.new-site');
     if (bwmBox) bwmBox.classList.add('active');
+    
+    // Update current site tracking to null (overview mode)
+    currentSiteKey = null;
     
     // Sync the dropdown to the current filter
     const dropdown = document.getElementById('demographicFilter');
