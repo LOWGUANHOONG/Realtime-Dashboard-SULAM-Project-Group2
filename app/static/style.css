@@ -73,7 +73,7 @@ html, body {
 .sidebar-grid {
     display: grid;
     grid-template-columns: 1fr 1fr; /* Two columns */
-    grid-template-rows: 2fr 1fr;    /* Top is taller than bottom row */
+    grid-template-rows: 2.5fr 1fr;    /* Equal height rows */
     gap: 12px;
     flex-grow: 1; /* Fills the middle space */
     padding: 15px 0;
@@ -190,7 +190,8 @@ html, body {
     padding: 10px;
     font-size: 0.7rem;
     border-radius: 5px;
-    margin-top: -200px;
+    margin-top: -220px;
+    margin-bottom: 10px;
 }
 
 .summary-container {
