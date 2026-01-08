@@ -1,3 +1,4 @@
+import os
 from app import create_app, socketio
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.data_pipeline.etl_functions import run_etl
@@ -13,7 +14,8 @@ scheduler.add_job(func=run_etl, trigger="interval", seconds=20, max_instances=1,
 scheduler.start()
 
 if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
     try:
-        socketio.run(app, debug=True)
+        socketio.run(app, host='0.0.0.0', port=port, debug=True)
     except (KeyboardInterrupt, SystemExit):
         scheduler.shutdown()
