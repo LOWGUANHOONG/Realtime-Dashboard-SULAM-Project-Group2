@@ -230,9 +230,16 @@ function updateDataPeriod(apiData, siteKey) {
     }
 
     // ONLY update the global max if we got a valid value (this should stay constant)
-    if (dbMaxYear && dbMaxMonth && (latestAvailableYear === 0 || latestAvailableMonth === 0)) {
-        latestAvailableYear = dbMaxYear;
-        latestAvailableMonth = dbMaxMonth;
+    if (dbMaxYear && dbMaxMonth) {
+        if (dbMaxYear > latestAvailableYear || (dbMaxYear === latestAvailableYear && dbMaxMonth > latestAvailableMonth)) {
+            console.log("New max date detected:", dbMaxMonth, dbMaxYear);
+            latestAvailableYear = dbMaxYear;
+            latestAvailableMonth = dbMaxMonth;
+            
+            // Optionally, automatically move the user to the new month if they were at the previous max
+            selectedYear = dbMaxYear;
+            selectedMonth = dbMaxMonth;
+        }
     }
 
     if (!selectedYear || !selectedMonth) {
@@ -248,7 +255,7 @@ function updateDataPeriod(apiData, siteKey) {
         // Always render with arrows (hidden by default)
         const currentMonthName = monthNames[selectedMonth - 1];
         const selectorHTML = `
-            <span class="latest-label">Latest:</span>
+            <span class="latest-label">Current:</span>
             <div class="date-value-container">
                 <div class="month-control">
                     <button class="date-arrow up-arrow" onclick="changeMonth(-1); event.stopPropagation();">▲</button>
