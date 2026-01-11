@@ -61,14 +61,3 @@ def get_dashboard_data():
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
-    
-
-@api_bp.route('/api/tables')
-def list_tables():
-    """Endpoint to list all tables in the database for debugging purposes."""
-    try:
-        tables = get_all_tables()
-        return jsonify({"status": "success", "tables": tables})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-    

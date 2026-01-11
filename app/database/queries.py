@@ -10,13 +10,6 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-def get_all_tables():
-    conn = get_db_connection()
-    query = "SELECT name FROM sqlite_master WHERE type='table';"
-    tables = [row['name'] for row in conn.execute(query).fetchall()]
-    conn.close()
-    return tables
-
 
 # Shared helper to determine the latest available period across org and site data
 def get_latest_period():
