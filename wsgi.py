@@ -5,6 +5,10 @@ from app.data_pipeline.etl_functions import run_etl
 
 app = create_app()
 
+with app.app_context():
+    print("Initializing database on startup...")
+    run_etl()
+
 scheduler = BackgroundScheduler()
 # Runs every 5 seconds, but the Hash logic above ensures it only does 
 # heavy work if you actually edited the Google Sheet
