@@ -7,7 +7,7 @@ import hashlib
 import json
 from oauth2client.service_account import ServiceAccountCredentials
 
-# --- LEAD'S CONFIGURATION ---
+# --- CONFIGURATION ---
 TABLE_MAP = {
     "Register_Sites": "sites",
     "Site_Data": "site_monthly_metrics",
@@ -32,20 +32,20 @@ COLUMN_MAPS = {
     "site_monthly_metrics": {
         "Site ID": "site_id",
         "Year": "year",
-        "Month": "month_name",  # Maps Sheet "Month" to DB "month_name"
+        "Month": "month_name",  
         "Donations💰": "donations",      
         "Sponsorships🤝": "sponsorships", 
         "Volunteers👥": "volunteers"
     },
     "org_stats": {
         "Year": "year",
-        "Month": "month_name",  # Maps Sheet "Month" to DB "month_name"         
+        "Month": "month_name",     
         "Total Members": "total_members",
         "Council Members": "council_members"
     },
     "org_demographics": {
         "Year": "year",
-        "Month": "month_name",  # Maps Sheet "Month" to DB "month_name"
+        "Month": "month_name",
         "Category": "category",
         "Label": "label",
         "Value": "value" 

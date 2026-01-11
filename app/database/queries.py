@@ -2,7 +2,6 @@ import sqlite3
 import os
 
 def get_db_connection():
-    # This gets the absolute path to the folder containing this script (app/database)
     current_dir = os.path.dirname(os.path.abspath(__file__))
     db_path = os.path.join(current_dir, 'dashboard.db')
     
@@ -11,7 +10,7 @@ def get_db_connection():
     return conn
 
 
-# Shared helper to determine the latest available period across org and site data
+# Determine the latest available period across org and site data
 def get_latest_period():
     conn = get_db_connection()
     query = """
@@ -139,7 +138,7 @@ def get_org_membership_chart(year=None, month=None):
         rows = conn.execute(query, (year, year, month)).fetchall()
         return [dict(row) for row in rows]
     except Exception as e:
-        print(f"Error in Membership Query: {e}") # Check your terminal for this!
+        print(f"Error in Membership Query: {e}")
         return []
     finally:
         conn.close()

@@ -5,10 +5,10 @@ class Config:
     BASE_DIR = os.path.abspath(os.path.dirname(__file__))
     SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(BASE_DIR, 'database', 'dashboard.db')
     
-    # Path where the temporary key file will be stored
+    # Path where the temporary key file will be stored (Local)
     GOOGLE_SHEETS_KEY = os.path.join(BASE_DIR, '..', 'service-account-key.json')
     
-    # NEW: Logic to handle environment variables on Render
+    # Logic to handle environment variables on Render (Deployed)
     google_creds_env = os.environ.get('GOOGLE_CREDS_JSON')
     
     if google_creds_env:
