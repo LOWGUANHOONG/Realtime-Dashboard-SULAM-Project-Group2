@@ -4,7 +4,7 @@ from flask_cors import CORS
 
 socketio = SocketIO()
 
-socketio.init_app(app, async_mode='gevent', cors_allowed_origins="*", logger=True, engineio_logger=True)
+
 
 def create_app():
     # static_folder tells Flask where index.html and script.js are
@@ -12,7 +12,7 @@ def create_app():
     app = Flask(__name__, static_folder='static', static_url_path='')
 
     CORS(app)
-    
+    socketio.init_app(app, async_mode='gevent', cors_allowed_origins="*", logger=True, engineio_logger=True)
 
     # Register the blueprint without a forced prefix so '/' works for the UI
     from .api.routes import api_bp
