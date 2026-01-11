@@ -12,7 +12,7 @@ Follow these instructions to set up the development environment and run the dash
 You can just press the link and view our deployed live dashboard!!<br>
 🌐 *Live Dashboard (Deployed):* [https://realtime-dashboard-sulam-project-group2.onrender.com/](https://realtime-dashboard-sulam-project-group2.onrender.com/)
 
-**⭐For better visuals experience, please click ``F11`` for full screen**
+**⭐For better visuals experience, please click ``F11`` for full screen**<br>
 **⭐Since we are using free tier, it may take a minute to spin up the service if more than 15 minutes inactivity. So kindly wait patiently for the displays.**
 
 
