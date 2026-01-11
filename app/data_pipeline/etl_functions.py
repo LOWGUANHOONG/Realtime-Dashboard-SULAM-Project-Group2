@@ -96,7 +96,6 @@ def run_etl():
             tab_name = sheet.title
             if tab_name not in TABLE_MAP: continue
             
-            print(f"Processing sheet/tab: {tab_name}", flush=True)
             # Fetch data from Google Sheets
             raw_data = sheet.get_all_values(value_render_option='UNFORMATTED_VALUE')
             if not raw_data: continue

@@ -6,8 +6,7 @@ from app.database.queries import (
     get_demographics_chart,
     get_master_contribution_index,
     get_individual_site_charts,
-    get_latest_period,
-    get_all_tables
+    get_latest_period
 )
 
 api_bp = Blueprint('api', __name__)
