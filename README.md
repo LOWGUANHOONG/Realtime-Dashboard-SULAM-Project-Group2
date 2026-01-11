@@ -8,11 +8,12 @@ A real-time data visualization dashboard developed for **Badan Warisan Malaysia 
 ## 🚀 Getting Started
 
 Follow these instructions to set up the development environment and run the dashboard on your local machine.<br>
-OR<br>
+**OR**<br>
 You can just press the link and view our deployed live dashboard!!<br>
 🌐 *Live Dashboard (Deployed):* [https://realtime-dashboard-sulam-project-group2.onrender.com/](https://realtime-dashboard-sulam-project-group2.onrender.com/)
 
-**For better visuals experience, please click ``F11`` for full screen**
+**⭐For better visuals experience, please click ``F11`` for full screen**
+
 
 ### 1. Prerequisites
 * **Python 3.9 or higher**
