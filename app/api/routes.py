@@ -6,7 +6,8 @@ from app.database.queries import (
     get_demographics_chart,
     get_master_contribution_index,
     get_individual_site_charts,
-    get_latest_period
+    get_latest_period,
+    get_all_tables
 )
 
 api_bp = Blueprint('api', __name__)
@@ -60,3 +61,14 @@ def get_dashboard_data():
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+    
+
+@api_bp.route('/api/tables')
+def list_tables():
+    """Endpoint to list all tables in the database for debugging purposes."""
+    try:
+        tables = get_all_tables()
+        return jsonify({"status": "success", "tables": tables})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    
