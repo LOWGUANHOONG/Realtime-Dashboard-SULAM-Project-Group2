@@ -8,7 +8,7 @@ print("Starting WSGI server...", flush=True)
 app = create_app()
 
 with app.app_context():
-    print("Initializing database on startup...")
+    print("Initializing database on startup...", flush=True)
     run_etl()
 
 scheduler = BackgroundScheduler()

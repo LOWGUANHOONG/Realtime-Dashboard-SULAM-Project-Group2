@@ -77,8 +77,16 @@ def run_etl():
 
         conn = sqlite3.connect(db_path)
 
+        google_creds_env = os.environ.get('GOOGLE_CREDS_JSON')
+            
+
         # 2. Authenticate and Open Spreadsheet
-        creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
+        if google_creds_env:
+            creds_dict = json.loads(google_creds_env)
+            creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+            print("Using Google credentials from environment variable.", flush=True)
+        else:
+            creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
         client = gspread.authorize(creds)
         spreadsheet = client.open("BWM data source (SULAM)")
 
@@ -88,6 +96,7 @@ def run_etl():
             tab_name = sheet.title
             if tab_name not in TABLE_MAP: continue
             
+            print(f"Processing sheet/tab: {tab_name}", flush=True)
             # Fetch data from Google Sheets
             raw_data = sheet.get_all_values(value_render_option='UNFORMATTED_VALUE')
             if not raw_data: continue

@@ -16,6 +16,6 @@ class Config:
         try:
             with open(GOOGLE_SHEETS_KEY, 'w') as f:
                 f.write(google_creds_env)
-            print("Successfully created service-account-key.json from environment variable.")
+            print("Successfully created service-account-key.json from environment variable.", flush=True)
         except Exception as e:
-            print(f"Error creating service account file: {e}")
+            print(f"Error creating service account file: {e}", flush=True)
