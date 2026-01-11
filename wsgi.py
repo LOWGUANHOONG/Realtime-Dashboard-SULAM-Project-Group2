@@ -3,7 +3,7 @@ from app import create_app, socketio
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.data_pipeline.etl_functions import run_etl
 
-print("Starting WSGI server...")
+print("Starting WSGI server...", flush=True)
 
 app = create_app()
 
